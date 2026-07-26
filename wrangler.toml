@@ -1,0 +1,12 @@
+name = "ryodo-navi-tokyo-api"
+main = "worker/src/index.ts"
+compatibility_date = "2026-07-26"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "ryodo-navi-tokyo"
+database_id = "replace-with-cloudflare-d1-id"
+
+[[kv_namespaces]]
+binding = "CACHE"
+id = "replace-with-cloudflare-kv-id"
