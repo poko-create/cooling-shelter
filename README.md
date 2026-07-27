@@ -28,9 +28,18 @@ npm run dev
 
 現時点ではローカルデモ用にブラウザ内状態で更新します。Cloudflare Workers + D1 用のAPIとスキーマも用意しています。
 
+## 歩行ルート
+
+本番想定では `VITE_API_BASE_URL` と Worker 側の `ORS_API_KEY` を設定すると、OpenRouteService Directions API の `foot-walking` で実際の歩行ルートを取得します。
+
+ローカル検証を簡単にする場合は、`.env.local` に `VITE_ORS_API_KEY` を設定すると、Workerを起動せずにブラウザからOpenRouteServiceへ直接問い合わせます。これはデモ検証用で、公開環境ではAPIキー保護のためWorker経由にしてください。
+
+未設定時はデモ用の参考ルートにフォールバックし、画面にもその旨を表示します。
+
 ## 環境変数
 
 - `VITE_API_BASE_URL`
+- `VITE_ORS_API_KEY`
 - `ORS_API_KEY`
 - `STAFF_UPDATE_TOKEN`
 - `AI_API_KEY`

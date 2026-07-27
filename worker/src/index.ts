@@ -14,6 +14,17 @@ const availabilitySchema = z.object({
   token: z.string().optional()
 });
 
+const routeRequestSchema = z.object({
+  coordinates: z.array(z.tuple([z.number(), z.number()])).length(2),
+  preference: z.string().optional(),
+  instructions: z.boolean().optional(),
+  alternative_routes: z.object({
+    target_count: z.number().int().min(1).max(3),
+    share_factor: z.number().min(0).max(1),
+    weight_factor: z.number().min(1)
+  }).optional()
+});
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -24,6 +35,12 @@ export default {
 
     if (url.pathname === "/api/health") {
       return json({ ok: true });
+    }
+
+    if (url.pathname === "/api/config" && request.method === "GET") {
+      return json({
+        openRouteServiceConfigured: Boolean(env.ORS_API_KEY)
+      });
     }
 
     if (url.pathname === "/api/availability" && request.method === "GET") {
@@ -83,7 +100,20 @@ async function updateAvailability(request: Request, env: Env) {
 
 async function routeProxy(request: Request, env: Env) {
   if (!env.ORS_API_KEY) {
-    return json({ error: "OpenRouteService API key is not configured" }, 503);
+    return json({
+      error: "OpenRouteService API key is not configured",
+      code: "ORS_API_KEY_MISSING"
+    }, 503);
+  }
+
+  const requestJson = await request.json().catch(() => null);
+  const parsed = routeRequestSchema.safeParse(requestJson);
+  if (!parsed.success) {
+    return json({
+      error: "Invalid route request",
+      code: "INVALID_ROUTE_REQUEST",
+      issues: parsed.error.issues
+    }, 400);
   }
 
   const upstream = await fetch("https://api.openrouteservice.org/v2/directions/foot-walking/geojson", {
@@ -92,8 +122,18 @@ async function routeProxy(request: Request, env: Env) {
       "Authorization": env.ORS_API_KEY,
       "Content-Type": "application/json"
     },
-    body: await request.text()
+    body: JSON.stringify(parsed.data)
   });
+
+  if (!upstream.ok) {
+    const upstreamText = await upstream.text().catch(() => "");
+    return json({
+      error: "OpenRouteService request failed",
+      code: "ORS_UPSTREAM_ERROR",
+      status: upstream.status,
+      detail: upstreamText.slice(0, 800)
+    }, upstream.status);
+  }
 
   return withCors(new Response(upstream.body, {
     status: upstream.status,

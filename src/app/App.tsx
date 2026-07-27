@@ -306,6 +306,11 @@ function RoutePanel({
         <Info label="涼しいルート" value={`${bestRoute.durationMinutes}分 / ${Math.round(bestRoute.distanceMeters)}m`} />
         <Info label="最短ルート" value={shortestRoute ? `${shortestRoute.durationMinutes}分 / ${Math.round(shortestRoute.distanceMeters)}m` : "取得中"} />
       </div>
+      {bestRoute.source === "demo-fallback" && (
+        <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+          OpenRouteService未接続のため、デモ用の参考ルートを表示しています。実際の歩行可能経路にするには VITE_ORS_API_KEY または Worker 経由の ORS_API_KEY を設定してください。
+        </p>
+      )}
       <div className="rounded-md bg-mist p-3">
         <p className="mb-2 text-sm font-bold">このルートがおすすめの理由</p>
         <ul className="space-y-1 text-sm text-slate-700">

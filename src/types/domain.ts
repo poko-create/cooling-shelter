@@ -51,6 +51,7 @@ export type RouteCandidate = {
   coordinates: LatLng[];
   distanceMeters: number;
   durationMinutes: number;
+  source: "openrouteservice" | "demo-fallback";
 };
 
 export type RouteScore = {
