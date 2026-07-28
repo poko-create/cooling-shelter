@@ -9,6 +9,7 @@
     "preview": "vite preview --host 0.0.0.0",
     "worker:dev": "wrangler dev worker/src/index.ts --port 8787",
     "worker:deploy": "wrangler deploy",
+    "data:plateau-buildings": "node scripts/extract-plateau-buildings.mjs",
     "test": "vitest run"
   },
   "dependencies": {

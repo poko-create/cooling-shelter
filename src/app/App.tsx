@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, LocateFixed, MapPin, Navigation, Route, Search, Trees, Users, Waves } from "lucide-react";
+import { AlertTriangle, Building2, LocateFixed, Navigation, Route, Search, Trees, Waves } from "lucide-react";
 import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
 import { initialAvailability, mockRestSpots, mockShelters, mockTrees } from "../data/mock/shelters";
@@ -9,6 +9,7 @@ import { getHeatRisk } from "../services/heatRisk";
 import { loadOpenData } from "../services/openData";
 import { getRouteCandidates, restSpotsNearRoute, scoreRoutes } from "../services/routes";
 import { statusClasses, statusLabels, statusShapes } from "../services/status";
+import { getDemoBuildingShadows } from "../services/buildingShade";
 import type { AreaMode, Availability, AvailabilityStatus, Destination, HeatRisk, LatLng, RestSpot, RouteCandidate, RouteScore, Shelter, TreePoint } from "../types/domain";
 import { MapView } from "../features/map/MapView";
 
@@ -26,6 +27,7 @@ export function App() {
   const [restSpots, setRestSpots] = useState<RestSpot[]>(mockRestSpots);
   const [trees, setTrees] = useState<TreePoint[]>(mockTrees);
   const [openDataSource, setOpenDataSource] = useState<"open-data" | "mock-fallback">("mock-fallback");
+  const [showBuildingShade, setShowBuildingShade] = useState(true);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -35,6 +37,7 @@ export function App() {
   const bestRoute = bestScore ? routes.find((route) => route.id === bestScore.routeId) ?? null : null;
   const shortestRoute = routes.find((route) => route.id === "shortest") ?? null;
   const routeRestSpots = bestRoute ? restSpotsNearRoute(bestRoute, restSpots) : restSpots;
+  const buildingShadows = useMemo(() => getDemoBuildingShadows(), []);
 
   useEffect(() => {
     loadOpenData().then((data) => {
@@ -189,6 +192,27 @@ export function App() {
               <strong className="text-xl">{heatRisk.score}</strong>
             </div>
           )}
+
+          <button
+            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
+              showBuildingShade
+                ? "border-slate-700 bg-slate-800 text-white"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+            onClick={() => setShowBuildingShade((current) => !current)}
+          >
+            <span className="flex items-center gap-2">
+              <Building2 size={18} />
+              建物日陰の目安
+            </span>
+            <span>{showBuildingShade ? "表示中" : "非表示"}</span>
+          </button>
+
+          {showBuildingShade && (
+            <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              江東区デモ限定の参考レイヤーです。固定日時の建物高さ目安から日陰を面で描画しており、緑陰スコアにはまだ反映していません。
+            </p>
+          )}
         </header>
 
         {areaMode === "current" && shelters.length <= DATA_SPARSE_THRESHOLD && (
@@ -210,6 +234,8 @@ export function App() {
             shelters={shelters}
             availability={availabilityMap}
             restSpots={routeRestSpots}
+            buildingShadows={buildingShadows}
+            showBuildingShade={showBuildingShade}
             destination={destination}
             bestRoute={bestRoute}
             shortestRoute={shortestRoute}
@@ -258,7 +284,7 @@ function Legend() {
       <span><span className="text-slate-500">■</span> 満員</span>
       <span className="flex items-center gap-1"><Trees size={14} /> 公園</span>
       <span className="flex items-center gap-1"><Waves size={14} /> 給水</span>
-      <span className="flex items-center gap-1"><Route size={14} /> ルート</span>
+      <span className="flex items-center gap-1"><Building2 size={14} /> 建物日陰</span>
     </div>
   );
 }

@@ -71,3 +71,12 @@ export type HeatRisk = {
   observedAt: string;
   source: string;
 };
+
+export type BuildingShadow = {
+  id: string;
+  name: string;
+  footprint: LatLng[];
+  shadow: LatLng[];
+  heightMeters: number;
+  source: string;
+};

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import { statusLabels, statusMarkerColors, statusShapes } from "../../services/status";
-import type { Availability, Destination, LatLng, RestSpot, RouteCandidate, Shelter } from "../../types/domain";
+import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter } from "../../types/domain";
 
 type Props = {
   center: LatLng;
@@ -9,6 +9,8 @@ type Props = {
   shelters: Shelter[];
   availability: Map<string, Availability>;
   restSpots: RestSpot[];
+  buildingShadows: BuildingShadow[];
+  showBuildingShade: boolean;
   destination: Destination | null;
   bestRoute: RouteCandidate | null;
   shortestRoute: RouteCandidate | null;
@@ -22,6 +24,8 @@ export function MapView({
   shelters,
   availability,
   restSpots,
+  buildingShadows,
+  showBuildingShade,
   destination,
   bestRoute,
   shortestRoute,
@@ -59,6 +63,26 @@ export function MapView({
     if (!layer) return;
 
     layer.clearLayers();
+
+    if (showBuildingShade) {
+      buildingShadows.forEach((item) => {
+        L.polygon(item.shadow.map((point) => [point.lat, point.lng]), {
+          color: "#1e293b",
+          fillColor: "#1e293b",
+          fillOpacity: 0.36,
+          opacity: 0.46,
+          weight: 0
+        }).bindTooltip(`${item.name} / ${item.source}`).addTo(layer);
+
+        L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
+          color: "#64748b",
+          fillColor: "#cbd5e1",
+          fillOpacity: 0.24,
+          opacity: 0.6,
+          weight: 1
+        }).bindTooltip(`${item.name} / 建物高さ 約${item.heightMeters}m`).addTo(layer);
+      });
+    }
 
     L.circleMarker([center.lat, center.lng], {
       radius: 8,
@@ -122,7 +146,7 @@ export function MapView({
         })
       }).bindTooltip(destination.label).addTo(layer);
     }
-  }, [availability, bestRoute, center.lat, center.lng, destination, onShelterSelect, restSpots, shelters, shortestRoute]);
+  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, destination, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade]);
 
   return <div ref={nodeRef} className="h-full min-h-[54vh] w-full" />;
 }
