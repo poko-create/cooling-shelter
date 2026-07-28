@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "worker:dev": "wrangler dev worker/src/index.ts",
+    "worker:dev": "wrangler dev worker/src/index.ts --port 8787",
     "worker:deploy": "wrangler deploy",
     "test": "vitest run"
   },

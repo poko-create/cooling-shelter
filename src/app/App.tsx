@@ -2,13 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, LocateFixed, MapPin, Navigation, Route, Search, Trees, Users, Waves } from "lucide-react";
 import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
-import { initialAvailability, mockRestSpots, mockShelters } from "../data/mock/shelters";
+import { initialAvailability, mockRestSpots, mockShelters, mockTrees } from "../data/mock/shelters";
 import { updateAvailability } from "../services/availabilityStore";
 import { searchDestination } from "../services/destinationSearch";
 import { getHeatRisk } from "../services/heatRisk";
+import { loadOpenData } from "../services/openData";
 import { getRouteCandidates, restSpotsNearRoute, scoreRoutes } from "../services/routes";
 import { statusClasses, statusLabels, statusShapes } from "../services/status";
-import type { AreaMode, Availability, AvailabilityStatus, Destination, HeatRisk, LatLng, RouteCandidate, RouteScore, Shelter } from "../types/domain";
+import type { AreaMode, Availability, AvailabilityStatus, Destination, HeatRisk, LatLng, RestSpot, RouteCandidate, RouteScore, Shelter, TreePoint } from "../types/domain";
 import { MapView } from "../features/map/MapView";
 
 export function App() {
@@ -21,6 +22,10 @@ export function App() {
   const [routes, setRoutes] = useState<RouteCandidate[]>([]);
   const [scores, setScores] = useState<RouteScore[]>([]);
   const [heatRisk, setHeatRisk] = useState<HeatRisk | null>(null);
+  const [shelters, setShelters] = useState<Shelter[]>(mockShelters);
+  const [restSpots, setRestSpots] = useState<RestSpot[]>(mockRestSpots);
+  const [trees, setTrees] = useState<TreePoint[]>(mockTrees);
+  const [openDataSource, setOpenDataSource] = useState<"open-data" | "mock-fallback">("mock-fallback");
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -29,7 +34,21 @@ export function App() {
   const bestScore = routeScores[0] ?? null;
   const bestRoute = bestScore ? routes.find((route) => route.id === bestScore.routeId) ?? null : null;
   const shortestRoute = routes.find((route) => route.id === "shortest") ?? null;
-  const routeRestSpots = bestRoute ? restSpotsNearRoute(bestRoute) : mockRestSpots;
+  const routeRestSpots = bestRoute ? restSpotsNearRoute(bestRoute, restSpots) : restSpots;
+
+  useEffect(() => {
+    loadOpenData().then((data) => {
+      setShelters(data.shelters);
+      setTrees(data.trees);
+      setRestSpots(data.restSpots);
+      setOpenDataSource(data.source);
+      if (data.source === "open-data") {
+        setMessage("東京都オープンデータを読み込みました。");
+      } else {
+        setMessage("オープンデータ取得に失敗したため、デモデータを表示しています。");
+      }
+    });
+  }, []);
 
   useEffect(() => {
     navigator.geolocation?.getCurrentPosition(
@@ -64,15 +83,15 @@ export function App() {
 
     getRouteCandidates(mapCenter, destination.position).then((nextRoutes) => {
       setRoutes(nextRoutes);
-      setScores(scoreRoutes(nextRoutes));
+      setScores(scoreRoutes(nextRoutes, trees, restSpots));
     });
-  }, [destination, mapCenter.lat, mapCenter.lng]);
+  }, [destination, mapCenter.lat, mapCenter.lng, restSpots, trees]);
 
   const availabilityMap = useMemo(() => {
     return new Map(availability.map((item) => [item.shelterId, item]));
   }, [availability]);
 
-  const staffShelter = staffShelterId ? mockShelters.find((item) => item.id === staffShelterId) ?? mockShelters[0] : null;
+  const staffShelter = staffShelterId ? shelters.find((item) => item.id === staffShelterId) ?? shelters[0] : null;
 
   function handleAvailabilityChange(shelterId: string, status: AvailabilityStatus) {
     const next = updateAvailability(availability, shelterId, status);
@@ -82,7 +101,7 @@ export function App() {
 
   async function handleSearchSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const result = await searchDestination(query);
+    const result = await searchDestination(query, [...shelters, ...restSpots]);
     if (!result) return;
 
     setDestination(result);
@@ -117,6 +136,9 @@ export function App() {
             <div>
               <p className="text-xs font-semibold text-leaf">都知事杯オープンデータ・ハッカソン2026</p>
               <h1 className="text-2xl font-bold tracking-normal">涼道ナビTOKYO</h1>
+              <p className="text-xs text-slate-500">
+                {openDataSource === "open-data" ? "東京都オープンデータ接続中" : "デモデータ表示中"}
+              </p>
             </div>
             <button
               className="flex min-h-11 items-center gap-2 rounded-md bg-leaf px-3 text-sm font-semibold text-white"
@@ -169,7 +191,7 @@ export function App() {
           )}
         </header>
 
-        {areaMode === "current" && mockShelters.length <= DATA_SPARSE_THRESHOLD && (
+        {areaMode === "current" && shelters.length <= DATA_SPARSE_THRESHOLD && (
           <div className="mx-4 mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
             このエリアはデータが少ない可能性があります。デモ対応エリア（江東区）もお試しください。
           </div>
@@ -185,7 +207,7 @@ export function App() {
           <MapView
             center={mapCenter}
             zoom={DEFAULT_ZOOM}
-            shelters={mockShelters}
+            shelters={shelters}
             availability={availabilityMap}
             restSpots={routeRestSpots}
             destination={destination}

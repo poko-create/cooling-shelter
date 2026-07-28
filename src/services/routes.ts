@@ -1,7 +1,7 @@
 import * as turf from "@turf/turf";
 import { ROUTE_BUFFER_METERS, SCORING_WEIGHTS } from "../config/scoring";
-import { mockRestSpots, mockTrees } from "../data/mock/shelters";
 import type { LatLng, RestSpot, RouteCandidate, RouteScore } from "../types/domain";
+import type { TreePoint } from "../types/domain";
 
 function distanceMeters(from: LatLng, to: LatLng) {
   return turf.distance([from.lng, from.lat], [to.lng, to.lat], { units: "kilometers" }) * 1000;
@@ -280,14 +280,18 @@ function mergeNodePaths(first: DemoNodeId[], second: DemoNodeId[]) {
     : [...first, ...second];
 }
 
-export function scoreRoutes(routes: RouteCandidate[]): RouteScore[] {
+export function scoreRoutes(
+  routes: RouteCandidate[],
+  trees: TreePoint[],
+  restSpots: RestSpot[]
+): RouteScore[] {
   const shortestMinutes = Math.min(...routes.map((route) => route.durationMinutes));
-  const maxTreeCount = Math.max(1, ...routes.map((route) => countNearRoute(route, "trees")));
-  const maxRestCount = Math.max(1, ...routes.map((route) => countNearRoute(route, "rest")));
+  const maxTreeCount = Math.max(1, ...routes.map((route) => countNearRoute(route, trees)));
+  const maxRestCount = Math.max(1, ...routes.map((route) => countNearRoute(route, restSpots)));
 
   return routes.map((route) => {
-    const treeCount = countNearRoute(route, "trees");
-    const nearRest = restSpotsNearRoute(route);
+    const treeCount = countNearRoute(route, trees);
+    const nearRest = restSpotsNearRoute(route, restSpots);
     const parkCount = nearRest.filter((spot) => spot.type === "park").length;
     const waterCount = nearRest.filter((spot) => spot.type === "water").length;
     const extraMinutes = Math.max(0, route.durationMinutes - shortestMinutes);
@@ -314,18 +318,17 @@ export function scoreRoutes(routes: RouteCandidate[]): RouteScore[] {
   });
 }
 
-export function restSpotsNearRoute(route: RouteCandidate): RestSpot[] {
+export function restSpotsNearRoute(route: RouteCandidate, restSpots: RestSpot[]): RestSpot[] {
   const line = turf.lineString(route.coordinates.map((point) => [point.lng, point.lat]));
-  return mockRestSpots.filter((spot) => {
+  return restSpots.filter((spot) => {
     const point = turf.point([spot.position.lng, spot.position.lat]);
     const distance = turf.pointToLineDistance(point, line, { units: "meters" });
     return distance <= ROUTE_BUFFER_METERS * 4;
   });
 }
 
-function countNearRoute(route: RouteCandidate, target: "trees" | "rest") {
+function countNearRoute(route: RouteCandidate, items: Array<TreePoint | RestSpot>) {
   const line = turf.lineString(route.coordinates.map((point) => [point.lng, point.lat]));
-  const items = target === "trees" ? mockTrees : mockRestSpots;
 
   return items.filter((item) => {
     const point = turf.point([item.position.lng, item.position.lat]);

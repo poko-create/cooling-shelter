@@ -25,6 +25,15 @@ const routeRequestSchema = z.object({
   }).optional()
 });
 
+const openDataSources = {
+  shelters: "https://www.opendata.metro.tokyo.lg.jp/koto/131083_202_cooling_shelter.csv",
+  trees: "https://www.opendata.metro.tokyo.lg.jp/kensetsu/tokyo_gairoju.csv",
+  parks: "https://www.city.koto.lg.jp/012107/documents/131083_kotocity_public_facility-17_parks.csv",
+  water: "https://www.opendata.metro.tokyo.lg.jp/suidou/R7/tokyowaterdrinkingstation_250917.csv"
+} as const;
+
+type OpenDataKind = keyof typeof openDataSources;
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -43,6 +52,11 @@ export default {
       });
     }
 
+    const openDataMatch = url.pathname.match(/^\/api\/open-data\/([^/]+)$/);
+    if (openDataMatch && request.method === "GET") {
+      return getOpenData(openDataMatch[1], env);
+    }
+
     if (url.pathname === "/api/availability" && request.method === "GET") {
       return getAvailability(env);
     }
@@ -58,6 +72,41 @@ export default {
     return json({ error: "Not found" }, 404);
   }
 };
+
+async function getOpenData(kindParam: string, env: Env) {
+  if (!isOpenDataKind(kindParam)) {
+    return json({ error: "Unknown open data source" }, 404);
+  }
+
+  const cacheKey = `open-data:${kindParam}`;
+  const cached = await env.CACHE?.get(cacheKey);
+  if (cached) {
+    return text(cached, {
+      "Cache-Control": "public, max-age=3600",
+      "X-Data-Source": "cache"
+    });
+  }
+
+  const upstream = await fetch(openDataSources[kindParam]);
+  if (!upstream.ok) {
+    return json({
+      error: "Failed to fetch open data",
+      status: upstream.status
+    }, upstream.status);
+  }
+
+  const decoded = new TextDecoder("shift_jis").decode(await upstream.arrayBuffer());
+  await env.CACHE?.put(cacheKey, decoded, { expirationTtl: 60 * 60 * 6 });
+
+  return text(decoded, {
+    "Cache-Control": "public, max-age=3600",
+    "X-Data-Source": "tokyo-open-data"
+  });
+}
+
+function isOpenDataKind(value: string): value is OpenDataKind {
+  return value in openDataSources;
+}
 
 async function getAvailability(env: Env) {
   if (!env.DB) return json({ items: [] });
@@ -148,6 +197,15 @@ function json(payload: unknown, status = 200) {
     status,
     headers: {
       "Content-Type": "application/json; charset=utf-8"
+    }
+  }));
+}
+
+function text(payload: string, headers: Record<string, string> = {}) {
+  return withCors(new Response(payload, {
+    headers: {
+      "Content-Type": "text/csv; charset=utf-8",
+      ...headers
     }
   }));
 }

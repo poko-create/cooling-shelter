@@ -1,7 +1,12 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { getRouteCandidates } from "../src/services/routes";
 
 describe("demo pedestrian fallback routes", () => {
+  beforeEach(() => {
+    vi.stubEnv("VITE_API_BASE_URL", "");
+    vi.stubEnv("VITE_ORS_API_KEY", "");
+  });
+
   it("uses a pedestrian graph instead of a direct line for Koto demo routes", async () => {
     const routes = await getRouteCandidates(
       { lat: 35.6729, lng: 139.8174 },
