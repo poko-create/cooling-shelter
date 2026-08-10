@@ -7,7 +7,7 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "worker:dev": "wrangler dev worker/src/index.ts --port 8787",
+    "worker:dev": "wrangler dev worker/src/index.ts",
     "worker:deploy": "wrangler deploy",
     "data:plateau-buildings": "node scripts/extract-plateau-buildings.mjs",
     "test": "vitest run"

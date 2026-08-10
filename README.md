@@ -9,6 +9,21 @@ npm install
 npm run dev
 ```
 
+API も含めてローカルで動かす場合は、別ターミナルで Worker も起動します。
+
+```bash
+npm run worker:dev
+```
+
+このプロジェクトのローカル固定ポートは次の通りです。
+
+- フロントエンド Vite: `5174`
+- API Worker: `8788`
+
+このリポジトリにはローカル用の設定ファイルとして [.env.local](.env.local) と [.dev.vars](.dev.vars) を入れてあります。
+前者はフロントから Worker を見るための URL、後者は Worker 側のローカル変数です。
+OpenRouteService の実ルートを使うには、[.dev.vars](.dev.vars) の `ORS_API_KEY` を自分のキーで埋めてください。
+
 ## 主な機能
 
 - 現在地モード / デモ保証エリア（江東区）モードの手動切り替え

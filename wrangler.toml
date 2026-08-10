@@ -2,6 +2,9 @@ name = "ryodo-navi-tokyo-api"
 main = "worker/src/index.ts"
 compatibility_date = "2026-07-26"
 
+[dev]
+port = 8788
+
 [[d1_databases]]
 binding = "DB"
 database_name = "ryodo-navi-tokyo"
