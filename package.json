@@ -9,6 +9,9 @@
     "preview": "vite preview --host 0.0.0.0",
     "worker:dev": "wrangler dev worker/src/index.ts",
     "worker:deploy": "wrangler deploy",
+    "start:worker": "wrangler dev worker/src/index.ts",
+    "start:frontend": "VITE_API_BASE_URL=http://127.0.0.1:8788 vite --host 0.0.0.0",
+    "start:local": "node scripts/start-local.mjs",
     "data:plateau-buildings": "node scripts/extract-plateau-buildings.mjs",
     "test": "vitest run"
   },
