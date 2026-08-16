@@ -280,18 +280,23 @@ function mergeNodePaths(first: DemoNodeId[], second: DemoNodeId[]) {
     : [...first, ...second];
 }
 
+export function filterGreenRestSpots(restSpots: RestSpot[]): RestSpot[] {
+  return restSpots.filter((spot) => spot.type === "park" || spot.type === "water");
+}
+
 export function scoreRoutes(
   routes: RouteCandidate[],
   trees: TreePoint[],
   restSpots: RestSpot[]
 ): RouteScore[] {
+  const greenSpots = filterGreenRestSpots(restSpots);
   const shortestMinutes = Math.min(...routes.map((route) => route.durationMinutes));
   const maxTreeCount = Math.max(1, ...routes.map((route) => countNearRoute(route, trees)));
-  const maxRestCount = Math.max(1, ...routes.map((route) => countNearRoute(route, restSpots)));
+  const maxRestCount = Math.max(1, ...routes.map((route) => countNearRoute(route, greenSpots)));
 
   return routes.map((route) => {
     const treeCount = countNearRoute(route, trees);
-    const nearRest = restSpotsNearRoute(route, restSpots);
+    const nearRest = restSpotsNearRoute(route, greenSpots);
     const parkCount = nearRest.filter((spot) => spot.type === "park").length;
     const waterCount = nearRest.filter((spot) => spot.type === "water").length;
     const extraMinutes = Math.max(0, route.durationMinutes - shortestMinutes);

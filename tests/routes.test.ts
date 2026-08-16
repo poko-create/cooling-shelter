@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { getRouteCandidates } from "../src/services/routes";
+import { filterGreenRestSpots, getRouteCandidates } from "../src/services/routes";
 
 describe("demo pedestrian fallback routes", () => {
   beforeEach(() => {
@@ -27,5 +27,16 @@ describe("demo pedestrian fallback routes", () => {
     );
 
     expect(routes[1].coordinates).toContainEqual({ lat: 35.6765, lng: 139.8077 });
+  });
+
+  it("filters green-score inputs to park and water spots only", () => {
+    const items = [
+      { id: "park-1", name: "公園", type: "park", position: { lat: 35.67, lng: 139.81 }, source: "test" },
+      { id: "water-1", name: "給水", type: "water", position: { lat: 35.68, lng: 139.82 }, source: "test" },
+      { id: "shelter-1", name: "避難所", type: "shelter", position: { lat: 35.69, lng: 139.83 }, source: "test" }
+    ] as any;
+
+    expect(filterGreenRestSpots(items)).toHaveLength(2);
+    expect(filterGreenRestSpots(items).every((item) => item.type === "park" || item.type === "water")).toBe(true);
   });
 });

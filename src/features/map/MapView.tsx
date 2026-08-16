@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import { statusLabels, statusMarkerColors, statusShapes } from "../../services/status";
-import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter } from "../../types/domain";
+import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter, Poi } from "../../types/domain";
 
 type Props = {
   center: LatLng;
@@ -9,12 +9,17 @@ type Props = {
   shelters: Shelter[];
   availability: Map<string, Availability>;
   restSpots: RestSpot[];
+  convenienceStores: Poi[];
   buildingShadows: BuildingShadow[];
   showBuildingShade: boolean;
+  showConvenienceStores: boolean;
+  showParkSpots: boolean;
+  showWaterSpots: boolean;
   destination: Destination | null;
   bestRoute: RouteCandidate | null;
   shortestRoute: RouteCandidate | null;
   onShelterSelect: (shelter: Shelter) => void;
+  onPoiSelect: (poi: Poi) => void;
   onMapTap: (position: LatLng) => void;
 };
 
@@ -24,12 +29,17 @@ export function MapView({
   shelters,
   availability,
   restSpots,
+  convenienceStores,
   buildingShadows,
   showBuildingShade,
+  showConvenienceStores,
+  showParkSpots,
+  showWaterSpots,
   destination,
   bestRoute,
   shortestRoute,
   onShelterSelect,
+  onPoiSelect,
   onMapTap
 }: Props) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
@@ -109,6 +119,9 @@ export function MapView({
 
     restSpots.forEach((spot) => {
       const isPark = spot.type === "park";
+      if (isPark && !showParkSpots) return;
+      if (!isPark && !showWaterSpots) return;
+
       L.marker([spot.position.lat, spot.position.lng], {
         icon: L.divIcon({
           className: "",
@@ -118,6 +131,22 @@ export function MapView({
         })
       }).bindTooltip(`${spot.name} / ${spot.source}`).addTo(layer);
     });
+
+    if (showConvenienceStores) {
+      (convenienceStores || []).forEach((p) => {
+        const marker = L.marker([p.position.lat, p.position.lng], {
+          icon: L.divIcon({
+            className: "",
+            html: `<div class="conv-pin">CV</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          })
+        });
+        marker.bindTooltip(`${p.name} / ${p.source}`);
+        marker.on("click", () => onPoiSelect(p));
+        marker.addTo(layer);
+      });
+    }
 
     if (shortestRoute) {
       L.polyline(shortestRoute.coordinates.map((point) => [point.lat, point.lng]), {
@@ -146,7 +175,7 @@ export function MapView({
         })
       }).bindTooltip(destination.label).addTo(layer);
     }
-  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, destination, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade]);
+  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, convenienceStores, destination, onPoiSelect, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade, showConvenienceStores, showParkSpots, showWaterSpots]);
 
   return <div ref={nodeRef} className="h-full min-h-[54vh] w-full" />;
 }

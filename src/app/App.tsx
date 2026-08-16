@@ -10,7 +10,8 @@ import { loadOpenData } from "../services/openData";
 import { getRouteCandidates, restSpotsNearRoute, scoreRoutes } from "../services/routes";
 import { statusClasses, statusLabels, statusShapes } from "../services/status";
 import { getDemoBuildingShadows } from "../services/buildingShade";
-import type { AreaMode, Availability, AvailabilityStatus, Destination, HeatRisk, LatLng, RestSpot, RouteCandidate, RouteScore, Shelter, TreePoint } from "../types/domain";
+import type { AreaMode, Availability, AvailabilityStatus, Destination, HeatRisk, LatLng, RestSpot, RouteCandidate, RouteScore, Shelter, TreePoint, Poi } from "../types/domain";
+import { fetchConvenienceStores } from "../services/places";
 import { MapView } from "../features/map/MapView";
 
 export function App() {
@@ -18,6 +19,7 @@ export function App() {
   const [areaMode, setAreaMode] = useState<AreaMode>("demo");
   const [currentPosition, setCurrentPosition] = useState<LatLng>(DEMO_AREA_CENTER);
   const [selectedShelter, setSelectedShelter] = useState<Shelter | null>(null);
+  const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
   const [availability, setAvailability] = useState<Availability[]>(initialAvailability);
   const [destination, setDestination] = useState<Destination | null>(null);
   const [routes, setRoutes] = useState<RouteCandidate[]>([]);
@@ -28,6 +30,9 @@ export function App() {
   const [trees, setTrees] = useState<TreePoint[]>(mockTrees);
   const [openDataSource, setOpenDataSource] = useState<"open-data" | "mock-fallback">("mock-fallback");
   const [showBuildingShade, setShowBuildingShade] = useState(true);
+  const [showConvenienceStores, setShowConvenienceStores] = useState(true);
+  const [showParkSpots, setShowParkSpots] = useState(true);
+  const [showWaterSpots, setShowWaterSpots] = useState(true);
   const [query, setQuery] = useState("");
   const [message, setMessage] = useState<string | null>(null);
 
@@ -38,6 +43,7 @@ export function App() {
   const shortestRoute = routes.find((route) => route.id === "shortest") ?? null;
   const routeRestSpots = bestRoute ? restSpotsNearRoute(bestRoute, restSpots) : restSpots;
   const buildingShadows = useMemo(() => getDemoBuildingShadows(), []);
+  const [pois, setPois] = useState<Poi[]>([]);
 
   useEffect(() => {
     loadOpenData().then((data) => {
@@ -82,6 +88,10 @@ export function App() {
   }, [mapCenter.lat, mapCenter.lng]);
 
   useEffect(() => {
+    fetchConvenienceStores(mapCenter, 800).then(setPois).catch(() => setPois([]));
+  }, [mapCenter.lat, mapCenter.lng]);
+
+  useEffect(() => {
     if (!destination) return;
 
     getRouteCandidates(mapCenter, destination.position).then((nextRoutes) => {
@@ -118,6 +128,15 @@ export function App() {
       kind: "shelter"
     });
     setSelectedShelter(null);
+  }
+
+  function handlePoiRoute(poi: Poi) {
+    setDestination({
+      label: poi.name,
+      position: poi.position,
+      kind: "search"
+    });
+    setSelectedPoi(null);
   }
 
   if (staffShelter) {
@@ -208,6 +227,51 @@ export function App() {
             <span>{showBuildingShade ? "表示中" : "非表示"}</span>
           </button>
 
+          <button
+            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
+              showConvenienceStores
+                ? "border-orange-500 bg-orange-500 text-white"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+            onClick={() => setShowConvenienceStores((current) => !current)}
+          >
+            <span className="flex items-center gap-2">
+              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/90 text-[10px] font-black text-orange-500">CV</span>
+              コンビニ
+            </span>
+            <span>{showConvenienceStores ? "表示中" : "非表示"}</span>
+          </button>
+
+          <button
+            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
+              showParkSpots
+                ? "border-emerald-600 bg-emerald-600 text-white"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+            onClick={() => setShowParkSpots((current) => !current)}
+          >
+            <span className="flex items-center gap-2">
+              <Trees size={16} />
+              公園
+            </span>
+            <span>{showParkSpots ? "表示中" : "非表示"}</span>
+          </button>
+
+          <button
+            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
+              showWaterSpots
+                ? "border-sky-500 bg-sky-500 text-white"
+                : "border-slate-200 bg-white text-slate-700"
+            }`}
+            onClick={() => setShowWaterSpots((current) => !current)}
+          >
+            <span className="flex items-center gap-2">
+              <Waves size={16} />
+              給水スポット
+            </span>
+            <span>{showWaterSpots ? "表示中" : "非表示"}</span>
+          </button>
+
           {showBuildingShade && (
             <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
               江東区デモ限定の参考レイヤーです。固定日時の建物高さ目安から日陰を面で描画しており、緑陰スコアにはまだ反映していません。
@@ -234,8 +298,13 @@ export function App() {
             shelters={shelters}
             availability={availabilityMap}
             restSpots={routeRestSpots}
+            convenienceStores={pois}
+            onPoiSelect={setSelectedPoi}
             buildingShadows={buildingShadows}
             showBuildingShade={showBuildingShade}
+            showConvenienceStores={showConvenienceStores}
+            showParkSpots={showParkSpots}
+            showWaterSpots={showWaterSpots}
             destination={destination}
             bestRoute={bestRoute}
             shortestRoute={shortestRoute}
@@ -264,6 +333,14 @@ export function App() {
             availability={availabilityMap.get(selectedShelter.id)}
             onClose={() => setSelectedShelter(null)}
             onRoute={() => handleShelterRoute(selectedShelter)}
+          />
+        )}
+        {selectedPoi && (
+          <PoiSheet
+            poi={selectedPoi}
+            center={mapCenter}
+            onClose={() => setSelectedPoi(null)}
+            onRoute={() => handlePoiRoute(selectedPoi)}
           />
         )}
       </div>
@@ -322,6 +399,55 @@ function ShelterSheet({
       <button className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf font-bold text-white" onClick={onRoute}>
         <Navigation size={18} />
         ここへ向かう（涼しいルートを見る）
+      </button>
+    </div>
+  );
+}
+
+function computeDistanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {
+  const toRad = (v: number) => (v * Math.PI) / 180;
+  const R = 6371000; // meters
+  const dLat = toRad(b.lat - a.lat);
+  const dLon = toRad(b.lng - a.lng);
+  const lat1 = toRad(a.lat);
+  const lat2 = toRad(b.lat);
+
+  const sinDLat = Math.sin(dLat / 2);
+  const sinDLon = Math.sin(dLon / 2);
+  const h = sinDLat * sinDLat + sinDLon * sinDLon * Math.cos(lat1) * Math.cos(lat2);
+  const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  return R * c;
+}
+
+function PoiSheet({
+  poi,
+  center,
+  onClose,
+  onRoute
+}: {
+  poi: Poi;
+  center: { lat: number; lng: number };
+  onClose: () => void;
+  onRoute: () => void;
+}) {
+  const distance = Math.round(computeDistanceMeters(center, poi.position));
+
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold">{poi.name}</h2>
+          <p className="text-sm text-slate-600">カテゴリ: {poi.category}</p>
+        </div>
+        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <Info label="距離" value={`${distance}m`} />
+        <Info label="提供元" value={poi.source} />
+      </div>
+      <button className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf font-bold text-white" onClick={onRoute}>
+        <Navigation size={18} />
+        ここへ向かう（ルート表示）
       </button>
     </div>
   );
