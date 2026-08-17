@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, LocateFixed, Navigation, Route, Search, Trees, Waves } from "lucide-react";
+import { AlertTriangle, Building2, LocateFixed, Navigation, Route, Search, Snowflake, Trees, Waves } from "lucide-react";
 import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
 import { initialAvailability, mockRestSpots, mockShelters, mockTrees } from "../data/mock/shelters";
@@ -132,35 +132,48 @@ export function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-200 text-ink">
-      <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-mist shadow-xl">
-        <header className="space-y-3 border-b border-emerald-100 bg-white px-4 py-4">
+    <main className="min-h-screen bg-gradient-to-br from-aqua-50 via-frost-50 to-aqua-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-white/60 shadow-glass backdrop-blur-sm">
+        <header className="space-y-4 px-4 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-semibold text-leaf">都知事杯オープンデータ・ハッカソン2026</p>
-              <h1 className="text-2xl font-bold tracking-normal">涼道ナビTOKYO</h1>
-              <p className="text-xs text-slate-500">
+            <div className="space-y-1">
+              <p className="badge-cool">
+                <Snowflake size={12} />
+                都知事杯オープンデータ・ハッカソン2026
+              </p>
+              <h1 className="text-2xl font-extrabold tracking-tight text-ink">
+                涼道ナビ<span className="text-aqua-500">TOKYO</span>
+              </h1>
+              <p className="text-xs text-glacial-400">
                 {openDataSource === "open-data" ? "東京都オープンデータ接続中" : "デモデータ表示中"}
               </p>
             </div>
             <button
-              className="flex min-h-11 items-center gap-2 rounded-md bg-leaf px-3 text-sm font-semibold text-white"
+              className="btn-cool flex items-center gap-2 text-sm"
               onClick={() => setAreaMode((mode) => (mode === "demo" ? "current" : "demo"))}
             >
-              <LocateFixed size={18} />
+              <LocateFixed size={16} />
               {areaMode === "demo" ? "江東区" : "現在地"}
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 rounded-md bg-emerald-50 p-1">
+          <div className="flex gap-1 rounded-2xl bg-aqua-50/80 p-1">
             <button
-              className={`min-h-11 rounded px-3 text-sm font-semibold ${areaMode === "current" ? "bg-white shadow-sm" : "text-slate-600"}`}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-300 ${
+                areaMode === "current"
+                  ? "bg-white text-aqua-600 shadow-frost"
+                  : "text-glacial-400 hover:text-glacial-600"
+              }`}
               onClick={() => setAreaMode("current")}
             >
               現在地モード
             </button>
             <button
-              className={`min-h-11 rounded px-3 text-sm font-semibold ${areaMode === "demo" ? "bg-white shadow-sm" : "text-slate-600"}`}
+              className={`flex-1 rounded-xl py-2.5 text-sm font-semibold transition-all duration-300 ${
+                areaMode === "demo"
+                  ? "bg-white text-aqua-600 shadow-frost"
+                  : "text-glacial-400 hover:text-glacial-600"
+              }`}
               onClick={() => setAreaMode("demo")}
             >
               デモ保証エリア
@@ -168,36 +181,40 @@ export function App() {
           </div>
 
           <form className="flex gap-2" onSubmit={handleSearchSubmit}>
-            <label className="flex min-h-11 flex-1 items-center gap-2 rounded-md border border-slate-200 bg-white px-3">
-              <Search size={18} className="text-slate-500" />
+            <div className="flex flex-1 items-center gap-2">
+              <Search size={18} className="text-aqua-400" />
               <input
-                className="w-full bg-transparent text-base outline-none"
+                className="input-frost flex-1"
                 placeholder="住所・地名を検索"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
               />
-            </label>
-            <button className="min-h-11 rounded-md bg-ink px-4 text-sm font-semibold text-white">検索</button>
+            </div>
+            <button className="btn-cool px-5 py-2.5 text-sm">検索</button>
           </form>
 
           {heatRisk && (
-            <div className="flex items-center justify-between rounded-md bg-amber-50 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={20} className="text-amber-600" />
+            <div className="card-frost flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-amber-100 to-orange-100">
+                  <AlertTriangle size={20} className="text-amber-600" />
+                </div>
                 <div>
-                  <p className="text-sm font-bold">熱中症リスク {heatRisk.level}</p>
-                  <p className="text-xs text-slate-600">WBGT {heatRisk.wbgt} / {heatRisk.source}</p>
+                  <p className="text-sm font-bold text-ink">熱中症リスク {heatRisk.level}</p>
+                  <p className="text-xs text-glacial-400">WBGT {heatRisk.wbgt} / {heatRisk.source}</p>
                 </div>
               </div>
-              <strong className="text-xl">{heatRisk.score}</strong>
+              <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-gradient-to-br from-amber-50 to-orange-50">
+                <strong className="text-xl font-bold text-amber-600">{heatRisk.score}</strong>
+              </div>
             </div>
           )}
 
           <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
+            className={`flex w-full items-center justify-between rounded-2xl border px-4 py-3 text-sm font-semibold transition-all duration-300 ${
               showBuildingShade
-                ? "border-slate-700 bg-slate-800 text-white"
-                : "border-slate-200 bg-white text-slate-700"
+                ? "border-aqua-200 bg-gradient-to-r from-aqua-500 to-frost-500 text-white shadow-frost"
+                : "border-glacial-200 bg-white/80 text-glacial-600 hover:border-aqua-200 hover:bg-aqua-50/50"
             }`}
             onClick={() => setShowBuildingShade((current) => !current)}
           >
@@ -205,24 +222,30 @@ export function App() {
               <Building2 size={18} />
               建物日陰の目安
             </span>
-            <span>{showBuildingShade ? "表示中" : "非表示"}</span>
+            <span className={`rounded-full px-2.5 py-0.5 text-xs font-bold ${
+              showBuildingShade ? "bg-white/20 text-white" : "bg-glacial-100 text-glacial-500"
+            }`}>
+              {showBuildingShade ? "表示中" : "非表示"}
+            </span>
           </button>
 
           {showBuildingShade && (
-            <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
+            <div className="rounded-2xl bg-aqua-50/60 px-4 py-3 text-xs leading-relaxed text-glacial-500">
               江東区デモ限定の参考レイヤーです。固定日時の建物高さ目安から日陰を面で描画しており、緑陰スコアにはまだ反映していません。
-            </p>
+            </div>
           )}
+
+          <div className="separator-cool" />
         </header>
 
         {areaMode === "current" && shelters.length <= DATA_SPARSE_THRESHOLD && (
-          <div className="mx-4 mt-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          <div className="mx-4 animate-fade-in rounded-2xl border border-amber-200/50 bg-gradient-to-r from-amber-50 to-orange-50 px-4 py-3 text-sm text-amber-800">
             このエリアはデータが少ない可能性があります。デモ対応エリア（江東区）もお試しください。
           </div>
         )}
 
         {message && (
-          <div className="mx-4 mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm text-white">
+          <div className="mx-4 mt-3 animate-fade-in rounded-2xl bg-gradient-to-r from-glacial-800 to-glacial-900 px-4 py-3 text-sm text-white shadow-lg">
             {message}
           </div>
         )}
@@ -278,13 +301,31 @@ function getStaffShelterId() {
 
 function Legend() {
   return (
-    <div className="grid grid-cols-3 gap-2 border-t border-emerald-100 bg-white px-4 py-3 text-xs">
-      <span><span className="text-sky-600">●</span> 空き</span>
-      <span><span className="text-warning">▲</span> やや混雑</span>
-      <span><span className="text-slate-500">■</span> 満員</span>
-      <span className="flex items-center gap-1"><Trees size={14} /> 公園</span>
-      <span className="flex items-center gap-1"><Waves size={14} /> 給水</span>
-      <span className="flex items-center gap-1"><Building2 size={14} /> 建物日陰</span>
+    <div className="grid grid-cols-3 gap-3 border-t border-aqua-100/50 bg-white/50 px-4 py-3 text-xs backdrop-blur-sm">
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-2.5 w-2.5 rounded-full bg-aqua-500" />
+        <span className="text-glacial-500">空き</span>
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-0 w-0 border-l-[5px] border-r-[5px] border-b-[8px] border-l-transparent border-r-transparent border-b-amber-400" />
+        <span className="text-glacial-500">やや混雑</span>
+      </span>
+      <span className="flex items-center gap-1.5">
+        <span className="inline-block h-2.5 w-2.5 rounded-sm bg-glacial-400" />
+        <span className="text-glacial-500">満員</span>
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Trees size={14} className="text-frost-500" />
+        <span className="text-glacial-500">公園</span>
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Waves size={14} className="text-aqua-400" />
+        <span className="text-glacial-500">給水</span>
+      </span>
+      <span className="flex items-center gap-1.5">
+        <Building2 size={14} className="text-glacial-400" />
+        <span className="text-glacial-500">建物日陰</span>
+      </span>
     </div>
   );
 }
@@ -304,22 +345,31 @@ function ShelterSheet({
   const stale = availability ? Date.now() - new Date(availability.updatedAt).getTime() > STALE_AVAILABILITY_HOURS * 60 * 60 * 1000 : false;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
-      <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
-          <h2 className="text-xl font-bold">{shelter.name}</h2>
-          <p className="text-sm text-slate-600">{shelter.address}</p>
+    <div className="animate-slide-up fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-3xl bg-white/90 p-5 shadow-glass-lg backdrop-blur-xl">
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div className="space-y-1">
+          <h2 className="text-xl font-bold text-ink">{shelter.name}</h2>
+          <p className="text-sm text-glacial-400">{shelter.address}</p>
         </div>
-        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+        <button
+          className="flex h-8 w-8 items-center justify-center rounded-full bg-glacial-100 text-glacial-500 transition-colors hover:bg-glacial-200 hover:text-glacial-700"
+          onClick={onClose}
+        >
+          ✕
+        </button>
       </div>
-      <div className="grid grid-cols-2 gap-2 text-sm">
+      <div className="grid grid-cols-2 gap-2">
         <Info label="定員" value={`${shelter.capacity}人`} />
         <Info label="開放時間" value={shelter.openHours} />
         <Info label="空き状況" value={`${statusShapes[status]} ${statusLabels[status]}`} />
         <Info label="最終更新" value={availability ? formatTime(availability.updatedAt) : "未更新"} />
       </div>
-      {stale && <p className="mt-3 rounded-md bg-amber-50 p-2 text-sm text-amber-900">情報が古い可能性があります。</p>}
-      <button className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-leaf font-bold text-white" onClick={onRoute}>
+      {stale && (
+        <div className="mt-3 rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2 text-sm text-amber-700">
+          情報が古い可能性があります。
+        </div>
+      )}
+      <button className="btn-cool mt-4 flex w-full items-center justify-center gap-2 py-3.5" onClick={onRoute}>
         <Navigation size={18} />
         ここへ向かう（涼しいルートを見る）
       </button>
@@ -339,15 +389,18 @@ function RoutePanel({
   bestScore: RouteScore;
 }) {
   return (
-    <section className="space-y-3 border-t border-emerald-100 bg-white px-4 py-4">
+    <section className="animate-slide-up space-y-4 border-t border-aqua-100/50 bg-white/70 px-4 py-4 backdrop-blur-sm">
       <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs font-semibold text-leaf">目的地</p>
-          <h2 className="text-lg font-bold">{destination.label}</h2>
+        <div className="space-y-0.5">
+          <p className="badge-cool w-fit">
+            <Navigation size={12} />
+            目的地
+          </p>
+          <h2 className="text-lg font-bold text-ink">{destination.label}</h2>
         </div>
-        <div className="rounded-md bg-emerald-50 px-3 py-2 text-center">
-          <p className="text-xs text-slate-600">緑陰スコア</p>
-          <strong className="text-2xl text-leaf">{bestScore.shadeScore}</strong>
+        <div className="flex flex-col items-center rounded-2xl bg-gradient-to-br from-aqua-50 to-frost-50 px-4 py-2.5">
+          <p className="text-xs text-glacial-400">緑陰スコア</p>
+          <strong className="text-2xl font-extrabold text-aqua-600">{bestScore.shadeScore}</strong>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -355,14 +408,19 @@ function RoutePanel({
         <Info label="最短ルート" value={shortestRoute ? `${shortestRoute.durationMinutes}分 / ${Math.round(shortestRoute.distanceMeters)}m` : "取得中"} />
       </div>
       {bestRoute.source === "demo-fallback" && (
-        <p className="rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-900">
+        <div className="rounded-xl bg-gradient-to-r from-amber-50 to-orange-50 px-3 py-2 text-xs text-amber-700">
           OpenRouteService未接続のため、デモ用の参考ルートを表示しています。実際の歩行可能経路にするには VITE_ORS_API_KEY または Worker 経由の ORS_API_KEY を設定してください。
-        </p>
+        </div>
       )}
-      <div className="rounded-md bg-mist p-3">
-        <p className="mb-2 text-sm font-bold">このルートがおすすめの理由</p>
-        <ul className="space-y-1 text-sm text-slate-700">
-          {bestScore.reasons.map((reason) => <li key={reason}>・{reason}</li>)}
+      <div className="card-frost">
+        <p className="mb-2 text-sm font-bold text-ink">このルートがおすすめの理由</p>
+        <ul className="space-y-1 text-sm text-glacial-600">
+          {bestScore.reasons.map((reason) => (
+            <li key={reason} className="flex items-start gap-1.5">
+              <span className="mt-0.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-aqua-400" />
+              {reason}
+            </li>
+          ))}
         </ul>
       </div>
     </section>
@@ -383,26 +441,37 @@ function StaffAvailabilityPage({
   const currentStatus = availability?.status ?? "open";
 
   return (
-    <main className="min-h-screen bg-slate-200 px-4 py-6 text-ink">
-      <div className="mx-auto max-w-[480px] space-y-4 rounded-lg bg-white p-5 shadow-xl">
-        <div>
-          <p className="text-sm font-semibold text-leaf">施設スタッフ用</p>
-          <h1 className="text-2xl font-bold">{shelter.name}</h1>
-          <p className="text-sm text-slate-600">現在: {statusLabels[currentStatus]} / 最終更新 {availability ? formatTime(availability.updatedAt) : "未更新"}</p>
+    <main className="min-h-screen bg-gradient-to-br from-aqua-50 via-frost-50 to-aqua-100 px-4 py-6">
+      <div className="mx-auto max-w-[480px] space-y-5 rounded-3xl bg-white/80 p-6 shadow-glass backdrop-blur-xl">
+        <div className="space-y-1">
+          <p className="badge-cool w-fit">
+            <Snowflake size={12} />
+            施設スタッフ用
+          </p>
+          <h1 className="text-2xl font-extrabold text-ink">{shelter.name}</h1>
+          <p className="text-sm text-glacial-400">
+            現在: {statusLabels[currentStatus]} / 最終更新 {availability ? formatTime(availability.updatedAt) : "未更新"}
+          </p>
         </div>
-        {message && <p className="rounded-md bg-slate-900 px-3 py-2 text-sm text-white">{message}</p>}
+        {message && (
+          <div className="rounded-2xl bg-gradient-to-r from-glacial-800 to-glacial-900 px-4 py-3 text-sm text-white shadow-lg">
+            {message}
+          </div>
+        )}
         <div className="grid gap-3">
           {(["open", "busy", "full"] as AvailabilityStatus[]).map((status) => (
             <button
               key={status}
-              className={`min-h-14 rounded-md text-lg font-bold ${statusClasses[status]}`}
+              className={`min-h-14 rounded-2xl text-lg font-bold transition-all duration-300 hover:scale-[1.02] hover:shadow-lg active:scale-[0.98] ${statusClasses[status]}`}
               onClick={() => onChange(status)}
             >
               {statusShapes[status]} {statusLabels[status]}
             </button>
           ))}
         </div>
-        <p className="text-xs text-slate-500">デモ用の簡易更新画面です。本番では正式な認証と権限管理が必要です。</p>
+        <p className="text-center text-xs text-glacial-400">
+          デモ用の簡易更新画面です。本番では正式な認証と権限管理が必要です。
+        </p>
       </div>
     </main>
   );
@@ -410,9 +479,9 @@ function StaffAvailabilityPage({
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 p-2">
-      <p className="text-xs text-slate-500">{label}</p>
-      <p className="font-semibold">{value}</p>
+    <div className="rounded-xl bg-aqua-50/60 p-3">
+      <p className="text-xs text-glacial-400">{label}</p>
+      <p className="font-semibold text-ink">{value}</p>
     </div>
   );
 }

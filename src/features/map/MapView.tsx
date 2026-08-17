@@ -18,6 +18,12 @@ type Props = {
   onMapTap: (position: LatLng) => void;
 };
 
+const modernMarkerColors: Record<string, string> = {
+  open: "#06b6d4",
+  busy: "#fbbf24",
+  full: "#94a3b8"
+};
+
 export function MapView({
   center,
   zoom,
@@ -43,9 +49,9 @@ export function MapView({
       zoomControl: false
     }).setView([center.lat, center.lng], zoom);
 
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
     }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
@@ -67,18 +73,18 @@ export function MapView({
     if (showBuildingShade) {
       buildingShadows.forEach((item) => {
         L.polygon(item.shadow.map((point) => [point.lat, point.lng]), {
-          color: "#1e293b",
-          fillColor: "#1e293b",
-          fillOpacity: 0.36,
-          opacity: 0.46,
+          color: "#0e7490",
+          fillColor: "#0e7490",
+          fillOpacity: 0.18,
+          opacity: 0.25,
           weight: 0
         }).bindTooltip(`${item.name} / ${item.source}`).addTo(layer);
 
         L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
-          color: "#64748b",
-          fillColor: "#cbd5e1",
-          fillOpacity: 0.24,
-          opacity: 0.6,
+          color: "#94a3b8",
+          fillColor: "#e2e8f0",
+          fillOpacity: 0.2,
+          opacity: 0.5,
           weight: 1
         }).bindTooltip(`${item.name} / 建物高さ 約${item.heightMeters}m`).addTo(layer);
       });
@@ -86,17 +92,20 @@ export function MapView({
 
     L.circleMarker([center.lat, center.lng], {
       radius: 8,
-      color: "#075985",
-      fillColor: "#0ea5e9",
-      fillOpacity: 0.9
+      color: "#0891b2",
+      fillColor: "#06b6d4",
+      fillOpacity: 0.9,
+      weight: 2,
+      opacity: 0.8
     }).bindTooltip("現在地").addTo(layer);
 
     shelters.forEach((shelter) => {
       const status = availability.get(shelter.id)?.status ?? "open";
+      const color = modernMarkerColors[status];
       const marker = L.marker([shelter.position.lat, shelter.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="map-pin" style="background:${statusMarkerColors[status]}"><span>${statusShapes[status]}</span></div>`,
+          html: `<div class="map-pin" style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%)"><span>${statusShapes[status]}</span></div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 17]
         })
@@ -109,10 +118,13 @@ export function MapView({
 
     restSpots.forEach((spot) => {
       const isPark = spot.type === "park";
+      const gradient = isPark
+        ? "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)"
+        : "linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%)";
       L.marker([spot.position.lat, spot.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="rest-pin ${isPark ? "rest-pin-park" : "rest-pin-water"}">${isPark ? "木" : "水"}</div>`,
+          html: `<div class="rest-pin" style="background: ${gradient}">${isPark ? "木" : "水"}</div>`,
           iconSize: [30, 30],
           iconAnchor: [15, 15]
         })
@@ -121,18 +133,18 @@ export function MapView({
 
     if (shortestRoute) {
       L.polyline(shortestRoute.coordinates.map((point) => [point.lat, point.lng]), {
-        color: "#334155",
-        weight: 5,
-        opacity: 0.7,
-        dashArray: "8 8"
+        color: "#94a3b8",
+        weight: 4,
+        opacity: 0.6,
+        dashArray: "10 6"
       }).addTo(layer);
     }
 
     if (bestRoute) {
       L.polyline(bestRoute.coordinates.map((point) => [point.lat, point.lng]), {
-        color: "#146b43",
+        color: "#06b6d4",
         weight: 6,
-        opacity: 0.9
+        opacity: 0.85
       }).addTo(layer);
     }
 
@@ -148,5 +160,5 @@ export function MapView({
     }
   }, [availability, bestRoute, buildingShadows, center.lat, center.lng, destination, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade]);
 
-  return <div ref={nodeRef} className="h-full min-h-[54vh] w-full" />;
+  return <div ref={nodeRef} className="h-full min-h-[54vh] w-full rounded-none" />;
 }

@@ -7,15 +7,15 @@ export const statusLabels: Record<AvailabilityStatus, string> = {
 };
 
 export const statusClasses: Record<AvailabilityStatus, string> = {
-  open: "bg-sky-600 text-white",
-  busy: "bg-warning text-ink",
-  full: "bg-slate-500 text-white"
+  open: "bg-gradient-to-r from-aqua-400 to-frost-500 text-white shadow-frost",
+  busy: "bg-gradient-to-r from-amber-400 to-yellow-400 text-amber-900 shadow-sm",
+  full: "bg-gradient-to-r from-glacial-300 to-glacial-400 text-white shadow-sm"
 };
 
 export const statusMarkerColors: Record<AvailabilityStatus, string> = {
-  open: "#0284c7",
-  busy: "#f4c430",
-  full: "#64748b"
+  open: "#06b6d4",
+  busy: "#fbbf24",
+  full: "#94a3b8"
 };
 
 export const statusShapes: Record<AvailabilityStatus, string> = {
