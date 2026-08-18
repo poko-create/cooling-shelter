@@ -80,3 +80,11 @@ export type BuildingShadow = {
   heightMeters: number;
   source: string;
 };
+
+export type Poi = {
+  id: string;
+  name: string;
+  category: string;
+  position: LatLng;
+  source: string;
+};

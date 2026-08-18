@@ -43,3 +43,18 @@ body {
   background: #111827;
   border-radius: 999px 999px 999px 4px;
 }
+
+.conv-pin {
+  background: #ff7f50;
+  align-items: center;
+  border: 2px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgb(15 23 42 / 22%);
+  color: #fff;
+  display: flex;
+  font-size: 12px;
+  font-weight: 800;
+  height: 100%;
+  justify-content: center;
+  width: 100%;
+}
