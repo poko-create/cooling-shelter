@@ -1,4 +1,4 @@
-import type { Destination, RestSpot, Shelter } from "../types/domain";
+import type { Destination, RestSpot, Shelter, Poi } from "../types/domain";
 
 const demoResults: Destination[] = [
   {
@@ -20,7 +20,7 @@ const demoResults: Destination[] = [
 
 export async function searchDestination(
   query: string,
-  localItems: Array<Shelter | RestSpot> = []
+  localItems: Array<Shelter | RestSpot | Poi> = []
 ): Promise<Destination | null> {
   const normalized = query.trim().toLowerCase();
   if (!normalized) return null;

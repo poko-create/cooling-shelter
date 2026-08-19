@@ -12,6 +12,7 @@ type Props = {
   convenienceStores: Poi[];
   buildingShadows: BuildingShadow[];
   showBuildingShade: boolean;
+  showShelters: boolean;
   showConvenienceStores: boolean;
   showParkSpots: boolean;
   showWaterSpots: boolean;
@@ -32,6 +33,7 @@ export function MapView({
   convenienceStores,
   buildingShadows,
   showBuildingShade,
+  showShelters,
   showConvenienceStores,
   showParkSpots,
   showWaterSpots,
@@ -102,11 +104,12 @@ export function MapView({
     }).bindTooltip("現在地").addTo(layer);
 
     shelters.forEach((shelter) => {
+      if (!showShelters) return;
       const status = availability.get(shelter.id)?.status ?? "open";
       const marker = L.marker([shelter.position.lat, shelter.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="map-pin" style="background:${statusMarkerColors[status]}"><span>${statusShapes[status]}</span></div>`,
+          html: `<div class="map-pin" style="background:${statusMarkerColors[status]}"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="2" x2="22" y1="12" y2="12"/><line x1="12" x2="12" y1="2" y2="22"/><path d="m20 16-4-4 4-4"/><path d="m4 8 4 4-4 4"/><path d="m16 4-4 4-4-4"/><path d="m8 20 4-4 4 4"/></svg></div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 17]
         })
@@ -125,7 +128,10 @@ export function MapView({
       L.marker([spot.position.lat, spot.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="rest-pin ${isPark ? "rest-pin-park" : "rest-pin-water"}">${isPark ? "木" : "水"}</div>`,
+          html: `<div class="rest-pin ${isPark ? "rest-pin-park" : "rest-pin-water"}">${isPark
+              ? `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 10v.2A3 3 0 0 1 8.9 16H5a3 3 0 0 1-1-5.8V10a3 3 0 0 1 6 0Z"/><path d="M7 16v6"/><path d="M13 19v3"/><path d="M12 19h8.3a1 1 0 0 0 .7-1.7L18 14h.3a1 1 0 0 0 .7-1.7L16 9h.2a1 1 0 0 0 .8-1.7L13 3l-1.4 1.5"/></svg>`
+              : `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 6c.6.5 1.2 1 2.5 1C7 7 7 5 9.5 5c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 12c.6.5 1.2 1 2.5 1C7 13 7 11 9.5 11c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/><path d="M2 18c.6.5 1.2 1 2.5 1C7 19 7 17 9.5 17c2.6 0 2.4 2 5 2 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1"/></svg>`
+            }</div>`,
           iconSize: [30, 30],
           iconAnchor: [15, 15]
         })
@@ -175,7 +181,7 @@ export function MapView({
         })
       }).bindTooltip(destination.label).addTo(layer);
     }
-  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, convenienceStores, destination, onPoiSelect, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade, showConvenienceStores, showParkSpots, showWaterSpots]);
+  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, convenienceStores, destination, onPoiSelect, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade, showConvenienceStores, showParkSpots, showShelters, showWaterSpots]);
 
   return <div ref={nodeRef} className="h-full min-h-[54vh] w-full" />;
 }
