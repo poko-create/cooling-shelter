@@ -128,6 +128,44 @@ body {
 }
 
 /* Map pin styles */
+.current-location-marker {
+  height: 88px;
+  pointer-events: none;
+  position: relative;
+  width: 88px;
+}
+
+.current-location-marker::before {
+  background: radial-gradient(circle, rgba(37, 99, 235, 0.3) 0%, rgba(37, 99, 235, 0.16) 36%, transparent 70%);
+  border-radius: 999px;
+  content: "";
+  inset: 15px;
+  position: absolute;
+}
+
+.current-location-beam {
+  background: conic-gradient(from 22deg, rgba(37, 99, 235, 0.38) 0deg, rgba(37, 99, 235, 0.2) 34deg, transparent 58deg, transparent 360deg);
+  border-radius: 999px;
+  height: 88px;
+  left: 0;
+  position: absolute;
+  top: 0;
+  transform: rotate(-72deg);
+  width: 88px;
+}
+
+.current-location-dot {
+  background: #2563eb;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  box-shadow: 0 0 0 2px rgba(30, 64, 175, 0.5), 0 8px 18px rgba(37, 99, 235, 0.42);
+  height: 18px;
+  left: 35px;
+  position: absolute;
+  top: 35px;
+  width: 18px;
+}
+
 .conv-pin {
   background: #ff7f50;
   align-items: center;

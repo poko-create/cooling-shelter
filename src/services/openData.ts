@@ -73,6 +73,7 @@ async function loadTrees(): Promise<TreePoint[]> {
   const rows = await fetchOpenDataRows("trees");
   return rows
     .map((row, index): TreePoint | null => {
+      if (!isKotoTreeRow(row)) return null;
       const lat = toNumber(row["緯度"]);
       const lng = toNumber(row["経度"]);
       if (!isInKotoBounds(lat, lng)) return null;
@@ -84,7 +85,11 @@ async function loadTrees(): Promise<TreePoint[]> {
       };
     })
     .filter((item): item is TreePoint => Boolean(item))
-    .slice(0, 2500);
+    .slice(0, 10000);
+}
+
+export function isKotoTreeRow(row: Record<string, string>) {
+  return !row["行政区"] || row["行政区"] === "江東区";
 }
 
 async function loadParks(): Promise<RestSpot[]> {

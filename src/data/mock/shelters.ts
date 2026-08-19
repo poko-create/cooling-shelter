@@ -1,4 +1,5 @@
 import type { Availability, RestSpot, Shelter, TreePoint } from "../../types/domain";
+import { kotoDemoTrees } from "./kotoTrees";
 
 export const mockShelters: Shelter[] = [
   {
@@ -36,16 +37,7 @@ export const initialAvailability: Availability[] = [
   { shelterId: "koto-003", status: "full", updatedAt: new Date(Date.now() - 4 * 60 * 60 * 1000).toISOString() }
 ];
 
-export const mockTrees: TreePoint[] = [
-  { id: "tree-001", species: "ケヤキ", position: { lat: 35.6721, lng: 139.8167 } },
-  { id: "tree-002", species: "イチョウ", position: { lat: 35.6728, lng: 139.8172 } },
-  { id: "tree-003", species: "サクラ", position: { lat: 35.6735, lng: 139.8184 } },
-  { id: "tree-004", species: "ケヤキ", position: { lat: 35.6741, lng: 139.8193 } },
-  { id: "tree-005", species: "プラタナス", position: { lat: 35.6709, lng: 139.8202 } },
-  { id: "tree-006", species: "イチョウ", position: { lat: 35.6699, lng: 139.8212 } },
-  { id: "tree-007", species: "ケヤキ", position: { lat: 35.6762, lng: 139.8121 } },
-  { id: "tree-008", species: "サクラ", position: { lat: 35.6784, lng: 139.8092 } }
-];
+export const mockTrees: TreePoint[] = kotoDemoTrees;
 
 export const mockRestSpots: RestSpot[] = [
   {

@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, Building2, CloudSun, LocateFixed, Navigation, Route, Search, Snowflake, SunMedium, Trees, Waves, Wind } from "lucide-react";
 import * as turf from "@turf/turf";
-import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, TOKYO_FALLBACK_CENTER } from "../config/area";
+import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, DEMO_CURRENT_POSITION, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
 import { initialAvailability, mockRestSpots, mockShelters, mockTrees } from "../data/mock/shelters";
 import { updateAvailability } from "../services/availabilityStore";
-import { searchDestination } from "../services/destinationSearch";
+import { searchDestination, searchDestinationSuggestions } from "../services/destinationSearch";
 import { getHeatRisk } from "../services/heatRisk";
 import { loadOpenData } from "../services/openData";
 import { getRouteCandidates, restSpotsNearRoute, scoreRoutes } from "../services/routes";
@@ -18,9 +18,11 @@ import { MapView } from "../features/map/MapView";
 export function App() {
   const staffShelterId = getStaffShelterId();
   const [areaMode, setAreaMode] = useState<AreaMode>("demo");
-  const [currentPosition, setCurrentPosition] = useState<LatLng>(DEMO_AREA_CENTER);
+  const [currentPosition, setCurrentPosition] = useState<LatLng>(DEMO_CURRENT_POSITION);
   const [selectedShelter, setSelectedShelter] = useState<Shelter | null>(null);
   const [selectedPoi, setSelectedPoi] = useState<Poi | null>(null);
+  const [selectedRestSpot, setSelectedRestSpot] = useState<RestSpot | null>(null);
+  const [selectedMapTap, setSelectedMapTap] = useState<LatLng | null>(null);
   const [availability, setAvailability] = useState<Availability[]>(initialAvailability);
   const [destination, setDestination] = useState<Destination | null>(null);
   const [routes, setRoutes] = useState<RouteCandidate[]>([]);
@@ -40,11 +42,13 @@ export function App() {
   const [showLocationSuggestions, setShowLocationSuggestions] = useState(false);
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [heatRiskExpanded, setHeatRiskExpanded] = useState(false);
+  const [placeSuggestions, setPlaceSuggestions] = useState<Destination[]>([]);
 
   const [message, setMessage] = useState<string | null>(null);
-  const mapCenter = areaMode === "demo" ? DEMO_AREA_CENTER : currentPosition;
-  const routeScores = useMemo(() => scores.sort((a, b) => b.shadeScore - a.shadeScore), [scores]);
-  const bestScore = routeScores[0] ?? null;
+  const mapCenter = areaMode === "demo" ? DEMO_CURRENT_POSITION : currentPosition;
+  const mapViewCenter = areaMode === "demo" ? DEMO_AREA_CENTER : currentPosition;
+  const routeScores = useMemo(() => [...scores].sort((a, b) => b.shadeScore - a.shadeScore), [scores]);
+  const bestScore = routeScores.find((score) => score.routeId !== "shortest") ?? routeScores[0] ?? null;
   const bestRoute = bestScore ? routes.find((route) => route.id === bestScore.routeId) ?? null : null;
   const shortestRoute = routes.find((route) => route.id === "shortest") ?? null;
   const routeRestSpots = bestRoute ? restSpotsNearRoute(bestRoute, restSpots) : restSpots;
@@ -110,9 +114,9 @@ export function App() {
 
     getRouteCandidates(mapCenter, destination.position).then((nextRoutes) => {
       setRoutes(nextRoutes);
-      setScores(scoreRoutes(nextRoutes, trees, restSpots));
+      setScores(scoreRoutes(nextRoutes, trees, restSpots, buildingShadows));
     });
-  }, [destination, mapCenter.lat, mapCenter.lng, restSpots, trees]);
+  }, [buildingShadows, destination, mapCenter.lat, mapCenter.lng, restSpots, trees]);
 
   const availabilityMap = useMemo(() => {
     return new Map(availability.map((item) => [item.shelterId, item]));
@@ -128,7 +132,7 @@ export function App() {
 
   async function handleSearchSubmit(event: React.FormEvent) {
     event.preventDefault();
-    const result = await searchDestination(query, [...shelters, ...restSpots, ...pois]);
+    const result = await searchDestination(query, [...shelters, ...restSpots, ...pois], mapCenter);
     if (!result) return;
     setDestination(result);
     setSelectedShelter(null);
@@ -143,12 +147,18 @@ export function App() {
 
   const searchSuggestions = useMemo(() => {
     if (!showSearchSuggestions) return [];
-    return [...shelters, ...restSpots, ...pois].sort((a, b) => {
+    const visibleShelters = showShelters ? shelters : [];
+    const visibleRestSpots = restSpots.filter(spot =>
+      (spot.type === 'park' && showParkSpots) ||
+      (spot.type === 'water' && showWaterSpots)
+    );
+    const visiblePois = showConvenienceStores ? pois : [];
+    return [...visibleShelters, ...visibleRestSpots, ...visiblePois].sort((a, b) => {
       const da = turf.distance([mapCenter.lng, mapCenter.lat], [a.position.lng, a.position.lat], { units: "kilometers" });
       const db = turf.distance([mapCenter.lng, mapCenter.lat], [b.position.lng, b.position.lat], { units: "kilometers" });
       return da - db;
     });
-  }, [showSearchSuggestions, mapCenter.lat, mapCenter.lng, shelters, restSpots, pois]);
+  }, [showSearchSuggestions, mapCenter.lat, mapCenter.lng, shelters, restSpots, pois, showShelters, showParkSpots, showWaterSpots, showConvenienceStores]);
 
   const locationSuggestions = useMemo(() => {
     if (!showLocationSuggestions) return [];
@@ -168,13 +178,39 @@ export function App() {
       const da = turf.distance([mapCenter.lng, mapCenter.lat], [a.position.lng, a.position.lat], { units: "kilometers" });
       const db = turf.distance([mapCenter.lng, mapCenter.lat], [b.position.lng, b.position.lat], { units: "kilometers" });
       return da - db;
-    }).slice(0, 25);
+    }).slice(0, 12);
   }, [showLocationSuggestions, locationQuery, shelters, restSpots, pois, mapCenter.lat, mapCenter.lng, showShelters, showParkSpots, showWaterSpots, showConvenienceStores]);
+
+  const combinedLocationSuggestions = useMemo(() => {
+    return [...locationSuggestions, ...placeSuggestions].slice(0, 18);
+  }, [locationSuggestions, placeSuggestions]);
+
+  useEffect(() => {
+    const q = locationQuery.trim();
+    if (!showLocationSuggestions || q.length < 2) {
+      setPlaceSuggestions([]);
+      return;
+    }
+
+    let cancelled = false;
+    const timer = setTimeout(() => {
+      searchDestinationSuggestions(q, mapCenter).then((items) => {
+        if (!cancelled) setPlaceSuggestions(items);
+      }).catch(() => {
+        if (!cancelled) setPlaceSuggestions([]);
+      });
+    }, 350);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [locationQuery, mapCenter.lat, mapCenter.lng, showLocationSuggestions]);
 
   async function handleStationSearch(event: React.FormEvent) {
     event.preventDefault();
     if (!locationQuery.trim()) return;
-    const result = await searchDestination(locationQuery, [...shelters, ...restSpots]);
+    const result = await searchDestination(locationQuery, [...shelters, ...restSpots, ...pois], mapCenter);
     if (!result) {
       setMessage(`「${locationQuery}」が見つかりません`);
       return;
@@ -184,9 +220,10 @@ export function App() {
     setSelectedShelter(null);
   }
 
-  function handleLocationSuggestionSelect(item: Shelter | RestSpot | Poi) {
-    setLocationQuery(item.name);
-    setDestination({ label: item.name, position: item.position, kind: "search" });
+  function handleLocationSuggestionSelect(item: Shelter | RestSpot | Poi | Destination) {
+    const label = "label" in item ? item.label : item.name;
+    setLocationQuery(label);
+    setDestination({ label, position: item.position, kind: "search" });
     setShowLocationSuggestions(false);
     setSelectedShelter(null);
   }
@@ -295,8 +332,8 @@ export function App() {
             </button>
           )}
 
-          <form className="relative flex gap-2" onSubmit={handleStationSearch}>
-            <label className="flex min-h-11 flex-1 items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
+          <form className="relative" onSubmit={handleStationSearch}>
+            <label className="flex min-h-11 w-full items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
               <Navigation size={18} className="text-aqua-400" />
               <input
                 className="w-full bg-transparent text-base outline-none"
@@ -307,24 +344,25 @@ export function App() {
                 onBlur={() => setTimeout(() => setShowLocationSuggestions(false), 200)}
               />
             </label>
-            <button className="min-h-11 rounded-2xl bg-gradient-to-r from-aqua-500 to-frost-500 px-4 text-sm font-semibold text-white shadow-frost">ルート</button>
-            {showLocationSuggestions && locationSuggestions.length > 0 && (
+            {showLocationSuggestions && combinedLocationSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
-                {locationSuggestions.map((item) => {
+                {combinedLocationSuggestions.map((item) => {
                   const dist = turf.distance([mapCenter.lng, mapCenter.lat], [item.position.lng, item.position.lat], { units: "kilometers" });
-                  const typeLabel = "capacity" in item ? "クーリングシェルター"
-                    : "type" in item ? (item.type === "park" ? "公園" : "給水スポット")
-                    : "コンビニ";
+                  const name = "label" in item ? item.label : item.name;
+                  const typeLabel = "label" in item ? "駅・地名"
+                    : "capacity" in item ? "クーリングシェルター"
+                      : "type" in item ? (item.type === "park" ? "公園" : "給水スポット")
+                        : "コンビニ";
                   return (
                     <button
-                      key={item.id}
+                      key={"id" in item ? item.id : `${item.label}-${item.position.lat}-${item.position.lng}`}
                       type="button"
                       className="w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-aqua-50"
                       onMouseDown={() => handleLocationSuggestionSelect(item)}
                     >
                       <div className="flex items-center justify-between">
                         <div>
-                          <div className="font-semibold">{item.name}</div>
+                          <div className="font-semibold">{name}</div>
                           <div className="text-xs text-slate-500">{typeLabel}</div>
                         </div>
                         <div className="ml-2 text-xs text-slate-400">{dist.toFixed(2)} km</div>
@@ -336,8 +374,8 @@ export function App() {
             )}
           </form>
 
-          <form className="relative flex gap-2" onSubmit={handleSearchSubmit}>
-            <label className="flex min-h-11 flex-1 items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
+          <form className="relative" onSubmit={handleSearchSubmit}>
+            <label className="flex min-h-11 w-full items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
               <Search size={18} className="text-aqua-400" />
               <input
                 className="w-full bg-transparent text-base outline-none"
@@ -346,9 +384,9 @@ export function App() {
                 onChange={(event) => setQuery(event.target.value)}
                 onFocus={() => setShowSearchSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
+                readOnly
               />
             </label>
-            <button className="min-h-11 rounded-2xl bg-ink px-4 text-sm font-semibold text-white">検索</button>
             {showSearchSuggestions && searchSuggestions.length > 0 && (
               <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
                 {searchSuggestions.map((item) => {
@@ -459,7 +497,7 @@ export function App() {
 
           {showBuildingShade && (
             <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              江東区デモ限定の参考レイヤーです。固定日時の建物高さ目安から日陰を面で描画しており、緑陰スコアにはまだ反映していません。
+              江東区デモ限定の参考レイヤーです。固定日時の建物高さ目安から日陰を面で描画し、ルートの緑陰スコアにも反映しています。
             </p>
           )}
         </header>
@@ -478,13 +516,13 @@ export function App() {
 
         <section className="min-h-[54vh] flex-1">
           <MapView
-            center={mapCenter}
+            center={mapViewCenter}
+            currentPosition={mapCenter}
             zoom={DEFAULT_ZOOM}
             shelters={shelters}
             availability={availabilityMap}
             restSpots={routeRestSpots}
             convenienceStores={pois}
-            onPoiSelect={setSelectedPoi}
             buildingShadows={buildingShadows}
             showBuildingShade={showBuildingShade}
             showShelters={showShelters}
@@ -492,12 +530,17 @@ export function App() {
             showParkSpots={showParkSpots}
             showWaterSpots={showWaterSpots}
             destination={destination}
+            selectedMapTap={selectedMapTap}
             bestRoute={bestRoute}
             shortestRoute={shortestRoute}
             onShelterSelect={setSelectedShelter}
+            onPoiSelect={setSelectedPoi}
+            onRestSpotSelect={setSelectedRestSpot}
             onMapTap={(position) => {
-              setDestination({ label: "地図で指定した場所", position, kind: "tap" });
+              setSelectedMapTap(position);
               setSelectedShelter(null);
+              setSelectedPoi(null);
+              setSelectedRestSpot(null);
             }}
           />
         </section>
@@ -529,6 +572,27 @@ export function App() {
             onRoute={() => handlePoiRoute(selectedPoi)}
           />
         )}
+        {selectedRestSpot && (
+          <RestSpotSheet
+            spot={selectedRestSpot}
+            center={mapCenter}
+            onClose={() => setSelectedRestSpot(null)}
+            onRoute={() => {
+              setDestination({ label: selectedRestSpot.name, position: selectedRestSpot.position, kind: "search" });
+              setSelectedRestSpot(null);
+            }}
+          />
+        )}
+        {selectedMapTap && (
+          <MapTapSheet
+            position={selectedMapTap}
+            onClose={() => setSelectedMapTap(null)}
+            onRoute={() => {
+              setDestination({ label: "地図で指定した場所", position: selectedMapTap, kind: "tap" });
+              setSelectedMapTap(null);
+            }}
+          />
+        )}
       </div>
     </main>
   );
@@ -537,6 +601,37 @@ export function App() {
 function getStaffShelterId() {
   const match = window.location.pathname.match(/^\/staff\/([^/]+)/);
   return match?.[1] ?? null;
+}
+
+function MapTapSheet({
+  position,
+  onClose,
+  onRoute
+}: {
+  position: LatLng;
+  onClose: () => void;
+  onRoute: () => void;
+}) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-lg font-bold">地図で指定した場所</h2>
+          <p className="text-sm text-slate-500">
+            {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
+          </p>
+        </div>
+        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+      </div>
+      <button
+        className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-aqua-500 font-bold text-white"
+        onClick={onRoute}
+      >
+        <Navigation size={18} />
+        ここへ向かう（涼しいルートを見る）
+      </button>
+    </div>
+  );
 }
 
 function Legend() {
@@ -603,6 +698,40 @@ function computeDistanceMeters(a: { lat: number; lng: number }, b: { lat: number
   const h = sinDLat * sinDLat + sinDLon * sinDLon * Math.cos(lat1) * Math.cos(lat2);
   const c = 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   return R * c;
+}
+
+function RestSpotSheet({
+  spot,
+  center,
+  onClose,
+  onRoute
+}: {
+  spot: RestSpot;
+  center: LatLng;
+  onClose: () => void;
+  onRoute: () => void;
+}) {
+  const distance = Math.round(computeDistanceMeters(center, spot.position));
+  const typeLabel = spot.type === "park" ? "公園" : "給水スポット";
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+      <div className="mb-3 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-bold">{spot.name}</h2>
+          <p className="text-sm text-slate-600">{typeLabel}</p>
+        </div>
+        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+      </div>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <Info label="距離" value={`${distance}m`} />
+        <Info label="提供元" value={spot.source} />
+      </div>
+      <button className="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-emerald-600 font-bold text-white" onClick={onRoute}>
+        <Navigation size={18} />
+        ここへ向かう（涼しいルートを見る）
+      </button>
+    </div>
+  );
 }
 
 function PoiSheet({

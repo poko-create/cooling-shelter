@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { filterGreenRestSpots, getRouteCandidates } from "../src/services/routes";
+import { mockTrees } from "../src/data/mock/shelters";
+import { filterGreenRestSpots, getRouteCandidates, scoreRoutes } from "../src/services/routes";
+import type { BuildingShadow, RouteCandidate } from "../src/types/domain";
 
 describe("demo pedestrian fallback routes", () => {
   beforeEach(() => {
@@ -29,6 +31,29 @@ describe("demo pedestrian fallback routes", () => {
     expect(routes[1].coordinates).toContainEqual({ lat: 35.6765, lng: 139.8077 });
   });
 
+  it("keeps fallback tree density nonzero around Ito-Yokado Kiba", async () => {
+    const routes = await getRouteCandidates(
+      { lat: 35.6729, lng: 139.8174 },
+      { lat: 35.666383, lng: 139.803886 }
+    );
+    const scores = scoreRoutes(routes, mockTrees, []);
+
+    expect(mockTrees.length).toBeGreaterThan(1000);
+    expect(scores.some((score) => score.treeCount > 0 && score.treeDensityPerKm > 0)).toBe(true);
+  });
+
+  it("includes fallback trees beyond the Kiba demo core", () => {
+    const ariakeAreaTrees = mockTrees.filter((tree) =>
+      tree.position.lat >= 35.63 &&
+      tree.position.lat <= 35.65 &&
+      tree.position.lng >= 139.78 &&
+      tree.position.lng <= 139.81
+    );
+
+    expect(mockTrees.length).toBeGreaterThan(9000);
+    expect(ariakeAreaTrees.length).toBeGreaterThan(0);
+  });
+
   it("filters green-score inputs to park and water spots only", () => {
     const items = [
       { id: "park-1", name: "公園", type: "park", position: { lat: 35.67, lng: 139.81 }, source: "test" },
@@ -38,5 +63,89 @@ describe("demo pedestrian fallback routes", () => {
 
     expect(filterGreenRestSpots(items)).toHaveLength(2);
     expect(filterGreenRestSpots(items).every((item) => item.type === "park" || item.type === "water")).toBe(true);
+  });
+
+  it("adds building shade overlap to route scores", () => {
+    const routes: RouteCandidate[] = [
+      {
+        id: "sunny",
+        label: "日なたルート",
+        coordinates: [{ lat: 35.0, lng: 139.0 }, { lat: 35.0, lng: 139.002 }],
+        distanceMeters: 180,
+        durationMinutes: 3,
+        source: "demo-fallback"
+      },
+      {
+        id: "shady",
+        label: "日陰ルート",
+        coordinates: [{ lat: 35.001, lng: 139.0 }, { lat: 35.001, lng: 139.002 }],
+        distanceMeters: 180,
+        durationMinutes: 3,
+        source: "demo-fallback"
+      }
+    ];
+    const buildingShadows: BuildingShadow[] = [{
+      id: "shade-1",
+      name: "test shade",
+      footprint: [],
+      shadow: [
+        { lat: 35.0008, lng: 138.9998 },
+        { lat: 35.0012, lng: 138.9998 },
+        { lat: 35.0012, lng: 139.0022 },
+        { lat: 35.0008, lng: 139.0022 }
+      ],
+      heightMeters: 20,
+      source: "test"
+    }];
+
+    const scores = scoreRoutes(routes, [], [], buildingShadows);
+    const sunny = scores.find((score) => score.routeId === "sunny");
+    const shady = scores.find((score) => score.routeId === "shady");
+
+    expect(shady?.buildingShadeMeters).toBeGreaterThan(0);
+    expect(shady?.buildingShadeRatio).toBeGreaterThan(0);
+    expect(shady?.shadeScore).toBeGreaterThan(sunny?.shadeScore ?? 0);
+  });
+
+  it("scores building shade by route share instead of absolute shaded meters", () => {
+    const routes: RouteCandidate[] = [
+      {
+        id: "short-shady",
+        label: "短い日陰ルート",
+        coordinates: [{ lat: 35.0, lng: 139.0 }, { lat: 35.0, lng: 139.001 }],
+        distanceMeters: 90,
+        durationMinutes: 2,
+        source: "demo-fallback"
+      },
+      {
+        id: "long-partial-shade",
+        label: "長い一部日陰ルート",
+        coordinates: [{ lat: 35.0, lng: 139.0 }, { lat: 35.0, lng: 139.004 }],
+        distanceMeters: 360,
+        durationMinutes: 5,
+        source: "demo-fallback"
+      }
+    ];
+    const buildingShadows: BuildingShadow[] = [{
+      id: "shade-1",
+      name: "test shade",
+      footprint: [],
+      shadow: [
+        { lat: 34.9998, lng: 138.9998 },
+        { lat: 35.0002, lng: 138.9998 },
+        { lat: 35.0002, lng: 139.0012 },
+        { lat: 34.9998, lng: 139.0012 }
+      ],
+      heightMeters: 20,
+      source: "test"
+    }];
+
+    const scores = scoreRoutes(routes, [], [], buildingShadows);
+    const shortShady = scores.find((score) => score.routeId === "short-shady");
+    const longPartialShade = scores.find((score) => score.routeId === "long-partial-shade");
+
+    expect(longPartialShade?.buildingShadeMeters).toBeGreaterThan(shortShady?.buildingShadeMeters ?? 0);
+    expect(shortShady?.buildingShadeRatio).toBeGreaterThan(longPartialShade?.buildingShadeRatio ?? 0);
+    expect(shortShady?.shadeScore).toBeGreaterThan(longPartialShade?.shadeScore ?? 0);
   });
 });

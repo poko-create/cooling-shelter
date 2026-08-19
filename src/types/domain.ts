@@ -58,6 +58,9 @@ export type RouteScore = {
   routeId: string;
   shadeScore: number;
   treeCount: number;
+  treeDensityPerKm: number;
+  buildingShadeMeters: number;
+  buildingShadeRatio: number;
   parkCount: number;
   waterCount: number;
   extraMinutes: number;

@@ -1,6 +1,6 @@
 import * as turf from "@turf/turf";
-import { ROUTE_BUFFER_METERS, SCORING_WEIGHTS } from "../config/scoring";
-import type { LatLng, RestSpot, RouteCandidate, RouteScore } from "../types/domain";
+import { BUILDING_SHADE_SAMPLE_METERS, ROUTE_BUFFER_METERS, SCORING_WEIGHTS } from "../config/scoring";
+import type { BuildingShadow, LatLng, RestSpot, RouteCandidate, RouteScore } from "../types/domain";
 import type { TreePoint } from "../types/domain";
 
 function distanceMeters(from: LatLng, to: LatLng) {
@@ -11,15 +11,40 @@ function routeDistance(coordinates: LatLng[]) {
   return coordinates.slice(1).reduce((sum, point, index) => sum + distanceMeters(coordinates[index], point), 0);
 }
 
+function uniqueRouteCandidates(routes: RouteCandidate[]) {
+  const seen = new Set<string>();
+  return routes.filter((route) => {
+    const signature = routeSignature(route.coordinates);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+}
+
+function uniqueRouteCoordinates(routes: LatLng[][]) {
+  const seen = new Set<string>();
+  return routes.filter((coordinates) => {
+    const signature = routeSignature(coordinates);
+    if (seen.has(signature)) return false;
+    seen.add(signature);
+    return true;
+  });
+}
+
+function routeSignature(coordinates: LatLng[]) {
+  return coordinates.map((point) => `${point.lat.toFixed(5)},${point.lng.toFixed(5)}`).join("|");
+}
+
 export async function getRouteCandidates(start: LatLng, end: LatLng): Promise<RouteCandidate[]> {
   const apiRoutes = await getOpenRouteServiceCandidates(start, end);
-  if (apiRoutes.length > 0) return apiRoutes;
+  if (apiRoutes.length > 0) return uniqueRouteCandidates(apiRoutes);
 
-  const shortest = buildDemoPedestrianRoute(start, end);
-  const viaGreen = buildDemoPedestrianRoute(start, end, "kiba-park");
-  const viaWater = buildDemoPedestrianRoute(start, end, "toyo-water");
+  const routeCoordinates = [
+    buildDemoPedestrianRoute(start, end),
+    ...demoWaypointCandidates.map((waypoint) => buildDemoPedestrianRoute(start, end, waypoint))
+  ];
 
-  return [shortest, viaGreen, viaWater].map((coordinates, index) => {
+  return uniqueRouteCoordinates(routeCoordinates).slice(0, 3).map((coordinates, index) => {
     const distance = routeDistance(coordinates);
     return {
       id: index === 0 ? "shortest" : `cool-${index}`,
@@ -287,41 +312,90 @@ export function filterGreenRestSpots(restSpots: RestSpot[]): RestSpot[] {
 export function scoreRoutes(
   routes: RouteCandidate[],
   trees: TreePoint[],
-  restSpots: RestSpot[]
+  restSpots: RestSpot[],
+  buildingShadows: BuildingShadow[] = []
 ): RouteScore[] {
   const greenSpots = filterGreenRestSpots(restSpots);
   const shortestMinutes = Math.min(...routes.map((route) => route.durationMinutes));
-  const maxTreeCount = Math.max(1, ...routes.map((route) => countNearRoute(route, trees)));
-  const maxRestCount = Math.max(1, ...routes.map((route) => countNearRoute(route, greenSpots)));
+  const metricsByRoute = new Map(
+    routes.map((route) => {
+      const treeCount = countNearRoute(route, trees);
+      const nearRest = restSpotsNearRoute(route, greenSpots);
+      const parkCount = nearRest.filter((spot) => spot.type === "park").length;
+      const waterCount = nearRest.filter((spot) => spot.type === "water").length;
+      const routeKilometers = Math.max(0.1, route.distanceMeters / 1000);
+      const buildingShadeMeters = routeBuildingShadeMeters(route, buildingShadows);
+
+      return [route.id, {
+        treeCount,
+        treeDensityPerKm: treeCount / routeKilometers,
+        buildingShadeMeters,
+        buildingShadeRatio: Math.min(1, buildingShadeMeters / Math.max(1, route.distanceMeters)),
+        parkCount,
+        waterCount,
+        restDensityPerKm: (parkCount + waterCount) / routeKilometers
+      }];
+    })
+  );
+  const maxTreeDensity = Math.max(0, ...[...metricsByRoute.values()].map((metrics) => metrics.treeDensityPerKm));
+  const maxRestDensity = Math.max(0, ...[...metricsByRoute.values()].map((metrics) => metrics.restDensityPerKm));
+  const maxBuildingShadeRatio = Math.max(0, ...[...metricsByRoute.values()].map((metrics) => metrics.buildingShadeRatio));
+  const usesBuildingShade = maxBuildingShadeRatio > 0;
+  const activeWeightTotal = usesBuildingShade
+    ? Object.values(SCORING_WEIGHTS).reduce((sum, weight) => sum + weight, 0)
+    : SCORING_WEIGHTS.treeDensity +
+      SCORING_WEIGHTS.greenPark +
+      SCORING_WEIGHTS.waterAndRest +
+      SCORING_WEIGHTS.shortDetour;
 
   return routes.map((route) => {
-    const treeCount = countNearRoute(route, trees);
-    const nearRest = restSpotsNearRoute(route, greenSpots);
-    const parkCount = nearRest.filter((spot) => spot.type === "park").length;
-    const waterCount = nearRest.filter((spot) => spot.type === "water").length;
+    const metrics = metricsByRoute.get(route.id) ?? {
+      treeCount: 0,
+      treeDensityPerKm: 0,
+      buildingShadeMeters: 0,
+      buildingShadeRatio: 0,
+      parkCount: 0,
+      waterCount: 0,
+      restDensityPerKm: 0
+    };
     const extraMinutes = Math.max(0, route.durationMinutes - shortestMinutes);
-    const treeScore = (treeCount / maxTreeCount) * 100;
-    const parkScore = Math.min(100, parkCount * 50);
-    const restScore = Math.min(100, (parkCount + waterCount) / maxRestCount * 100);
+    const treeScore = maxTreeDensity > 0 ? (metrics.treeDensityPerKm / maxTreeDensity) * 100 : 0;
+    const buildingShadeScore = usesBuildingShade ? (metrics.buildingShadeRatio / maxBuildingShadeRatio) * 100 : 0;
+    const parkScore = Math.min(100, metrics.parkCount * 50);
+    const restScore = maxRestDensity > 0 ? (metrics.restDensityPerKm / maxRestDensity) * 100 : 0;
     const detourScore = Math.max(0, 100 - extraMinutes * 12);
     const shadeScore = Math.round(
-      treeScore * SCORING_WEIGHTS.treeDensity +
+      (
+        treeScore * SCORING_WEIGHTS.treeDensity +
+        (usesBuildingShade ? buildingShadeScore * SCORING_WEIGHTS.buildingShade : 0) +
         parkScore * SCORING_WEIGHTS.greenPark +
         restScore * SCORING_WEIGHTS.waterAndRest +
         detourScore * SCORING_WEIGHTS.shortDetour
+      ) / activeWeightTotal
     );
 
     return {
       routeId: route.id,
       shadeScore,
-      treeCount,
-      parkCount,
-      waterCount,
+      treeCount: metrics.treeCount,
+      treeDensityPerKm: metrics.treeDensityPerKm,
+      buildingShadeMeters: metrics.buildingShadeMeters,
+      buildingShadeRatio: metrics.buildingShadeRatio,
+      parkCount: metrics.parkCount,
+      waterCount: metrics.waterCount,
       extraMinutes,
-      reasons: buildReasons(route, treeCount, parkCount, waterCount, extraMinutes)
+      reasons: buildReasons(route, metrics, extraMinutes)
     };
   });
 }
+
+const demoWaypointCandidates: DemoNodeId[] = [
+  "kiba-park",
+  "toyo-water",
+  "sendaibori-east",
+  "sendaibori-west",
+  "koto-office"
+];
 
 export function restSpotsNearRoute(route: RouteCandidate, restSpots: RestSpot[]): RestSpot[] {
   const line = turf.lineString(route.coordinates.map((point) => [point.lng, point.lat]));
@@ -341,20 +415,55 @@ function countNearRoute(route: RouteCandidate, items: Array<TreePoint | RestSpot
   }).length;
 }
 
-function buildReasons(
-  route: RouteCandidate,
-  treeCount: number,
-  parkCount: number,
-  waterCount: number,
-  extraMinutes: number
-) {
+function routeBuildingShadeMeters(route: RouteCandidate, buildingShadows: BuildingShadow[]) {
+  if (buildingShadows.length === 0) return 0;
+
+  const shadowPolygons = buildingShadows
+    .filter((item) => item.shadow.length >= 3)
+    .map((item) => {
+      const ring = item.shadow.map((point) => [point.lng, point.lat]);
+      return turf.polygon([[...ring, ring[0]]]);
+    });
+
+  if (shadowPolygons.length === 0) return 0;
+
+  return route.coordinates.slice(1).reduce((shadeMeters, point, index) => {
+    const start = route.coordinates[index];
+    const segmentMeters = distanceMeters(start, point);
+    const samples = Math.max(1, Math.ceil(segmentMeters / BUILDING_SHADE_SAMPLE_METERS));
+    const sampleMeters = segmentMeters / samples;
+
+    for (let sampleIndex = 0; sampleIndex < samples; sampleIndex += 1) {
+      const ratio = (sampleIndex + 0.5) / samples;
+      const sample = turf.point([
+        start.lng + (point.lng - start.lng) * ratio,
+        start.lat + (point.lat - start.lat) * ratio
+      ]);
+      if (shadowPolygons.some((polygon) => turf.booleanPointInPolygon(sample, polygon))) {
+        shadeMeters += sampleMeters;
+      }
+    }
+
+    return shadeMeters;
+  }, 0);
+}
+
+function buildReasons(route: RouteCandidate, metrics: {
+  treeCount: number;
+  treeDensityPerKm: number;
+  buildingShadeMeters: number;
+  buildingShadeRatio: number;
+  parkCount: number;
+  waterCount: number;
+}, extraMinutes: number) {
   const reasons = [
-    `${route.label}はルート周辺の街路樹が${treeCount}本あります`,
+    `${route.label}はルート周辺の街路樹密度が約${metrics.treeDensityPerKm.toFixed(1)}本/kmです`,
+    `建物日陰の目安と重なる区間が約${Math.round(metrics.buildingShadeMeters)}m（ルートの約${Math.round(metrics.buildingShadeRatio * 100)}%）あります`,
     `最短ルートとの差分は約${extraMinutes}分です`
   ];
 
-  if (parkCount > 0) reasons.push(`緑陰の多い公園を${parkCount}か所通ります`);
-  if (waterCount > 0) reasons.push(`給水スポットが${waterCount}か所あります`);
+  if (metrics.parkCount > 0) reasons.push(`緑陰の多い公園を${metrics.parkCount}か所通ります`);
+  if (metrics.waterCount > 0) reasons.push(`給水スポットが${metrics.waterCount}か所あります`);
 
   return reasons;
 }
