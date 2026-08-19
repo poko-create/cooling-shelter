@@ -21,7 +21,7 @@ out center;`;
 
   if (!res.ok) return [];
 
-  const data = await res.json().catch(() => null);
+  const data = await res.json().catch(() => null) as { elements?: unknown[] } | null;
   if (!data || !Array.isArray(data.elements)) return [];
 
   const pois: Poi[] = data.elements.map((el: any) => {

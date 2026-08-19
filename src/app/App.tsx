@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, LocateFixed, Navigation, Route, Search, Trees, Waves } from "lucide-react";
+import { AlertTriangle, Building2, CloudSun, LocateFixed, Navigation, Route, Search, Snowflake, SunMedium, Trees, Waves, Wind } from "lucide-react";
+import * as turf from "@turf/turf";
 import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
 import { initialAvailability, mockRestSpots, mockShelters, mockTrees } from "../data/mock/shelters";
@@ -34,6 +35,8 @@ export function App() {
   const [showParkSpots, setShowParkSpots] = useState(true);
   const [showWaterSpots, setShowWaterSpots] = useState(true);
   const [query, setQuery] = useState("");
+  const [locationQuery, setLocationQuery] = useState("");
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
   const mapCenter = areaMode === "demo" ? DEMO_AREA_CENTER : currentPosition;
@@ -80,6 +83,11 @@ export function App() {
       setHeatRisk({
         level: "警戒",
         score: 68,
+        temperature: 29.0,
+        humidity: 65,
+        windSpeed: 2.0,
+        apparentTemperature: 32.0,
+        uvIndex: 6.0,
         wbgt: 29.1,
         observedAt: new Date().toISOString(),
         source: "WBGT取得失敗時のフォールバック"
@@ -116,9 +124,37 @@ export function App() {
     event.preventDefault();
     const result = await searchDestination(query, [...shelters, ...restSpots]);
     if (!result) return;
-
     setDestination(result);
     setSelectedShelter(null);
+    setShowSearchSuggestions(false);
+  }
+
+  function handleSuggestionSelect(item: Shelter | RestSpot) {
+    setQuery(item.name);
+    setDestination({ label: item.name, position: item.position, kind: "search" });
+    setSelectedShelter(null);
+  }
+
+  const searchSuggestions = useMemo(() => {
+    if (!showSearchSuggestions) return [];
+    return [...shelters, ...restSpots].sort((a, b) => {
+      const da = turf.distance([mapCenter.lng, mapCenter.lat], [a.position.lng, a.position.lat], { units: "kilometers" });
+      const db = turf.distance([mapCenter.lng, mapCenter.lat], [b.position.lng, b.position.lat], { units: "kilometers" });
+      return da - db;
+    });
+  }, [showSearchSuggestions, mapCenter.lat, mapCenter.lng, shelters, restSpots]);
+
+  async function handleStationSearch(event: React.FormEvent) {
+    event.preventDefault();
+    if (!locationQuery.trim()) return;
+    const result = await searchDestination(locationQuery, [...shelters, ...restSpots]);
+    if (!result) {
+      setMessage(`「${locationQuery}」が見つかりません`);
+      return;
+    }
+    setCurrentPosition(result.position);
+    setLocationQuery(result.label);
+    setMessage(`現在地を「${result.label}」に設定しました`);
   }
 
   function handleShelterRoute(shelter: Shelter) {
@@ -151,19 +187,19 @@ export function App() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-200 text-ink">
-      <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-mist shadow-xl">
-        <header className="space-y-3 border-b border-emerald-100 bg-white px-4 py-4">
+    <main className="min-h-screen bg-gradient-to-br from-aqua-50 via-frost-50 to-aqua-100">
+      <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-white/60 shadow-glass backdrop-blur-sm">
+        <header className="space-y-3 border-b border-aqua-100/50 bg-white/70 px-4 py-4 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-semibold text-leaf">都知事杯オープンデータ・ハッカソン2026</p>
-              <h1 className="text-2xl font-bold tracking-normal">涼道ナビTOKYO</h1>
-              <p className="text-xs text-slate-500">
+              <p className="flex items-center gap-1 text-xs font-semibold text-aqua-600"><Snowflake size={12} /> 都知事杯オープンデータ・ハッカソン2026</p>
+              <h1 className="text-2xl font-bold tracking-normal">涼道ナビ<span className="text-aqua-500">TOKYO</span></h1>
+              <p className="text-xs text-glacial-400">
                 {openDataSource === "open-data" ? "東京都オープンデータ接続中" : "デモデータ表示中"}
               </p>
             </div>
             <button
-              className="flex min-h-11 items-center gap-2 rounded-md bg-leaf px-3 text-sm font-semibold text-white"
+              className="flex min-h-11 items-center gap-2 rounded-2xl bg-gradient-to-r from-aqua-500 to-frost-500 px-3 text-sm font-semibold text-white shadow-frost"
               onClick={() => setAreaMode((mode) => (mode === "demo" ? "current" : "demo"))}
             >
               <LocateFixed size={18} />
@@ -171,52 +207,105 @@ export function App() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-2 rounded-md bg-emerald-50 p-1">
+          <div className="flex gap-1 rounded-2xl bg-aqua-50/80 p-1">
             <button
-              className={`min-h-11 rounded px-3 text-sm font-semibold ${areaMode === "current" ? "bg-white shadow-sm" : "text-slate-600"}`}
+              className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-semibold transition-all ${
+                areaMode === "current" ? "bg-white text-aqua-600 shadow-frost" : "text-glacial-500"
+              }`}
               onClick={() => setAreaMode("current")}
             >
               現在地モード
             </button>
             <button
-              className={`min-h-11 rounded px-3 text-sm font-semibold ${areaMode === "demo" ? "bg-white shadow-sm" : "text-slate-600"}`}
+              className={`min-h-11 flex-1 rounded-xl px-3 text-sm font-semibold transition-all ${
+                areaMode === "demo" ? "bg-white text-aqua-600 shadow-frost" : "text-glacial-500"
+              }`}
               onClick={() => setAreaMode("demo")}
             >
               デモ保証エリア
             </button>
           </div>
 
-          <form className="flex gap-2" onSubmit={handleSearchSubmit}>
-            <label className="flex min-h-11 flex-1 items-center gap-2 rounded-md border border-slate-200 bg-white px-3">
-              <Search size={18} className="text-slate-500" />
-              <input
-                className="w-full bg-transparent text-base outline-none"
-                placeholder="住所・地名を検索"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
-              />
-            </label>
-            <button className="min-h-11 rounded-md bg-ink px-4 text-sm font-semibold text-white">検索</button>
-          </form>
-
           {heatRisk && (
-            <div className="flex items-center justify-between rounded-md bg-amber-50 px-3 py-2">
-              <div className="flex items-center gap-2">
-                <AlertTriangle size={20} className="text-amber-600" />
-                <div>
+            <div className="rounded-2xl bg-amber-50 p-3">
+              <div className="mb-2 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle size={18} className="text-amber-600" />
                   <p className="text-sm font-bold">熱中症リスク {heatRisk.level}</p>
-                  <p className="text-xs text-slate-600">WBGT {heatRisk.wbgt} / {heatRisk.source}</p>
+                </div>
+                <div className="text-right">
+                  <strong className="block text-xl leading-none">{heatRisk.score}</strong>
+                  <span className="text-[10px] text-slate-500">指標</span>
                 </div>
               </div>
-              <strong className="text-xl">{heatRisk.score}</strong>
+              <div className="grid grid-cols-3 gap-2 text-center text-xs">
+                <WeatherCard icon={<CloudSun size={16} className="text-amber-500" />} label="気温" value={`${heatRisk.temperature.toFixed(1)}℃`} />
+                <WeatherCard icon={<Wind size={16} className="text-sky-500" />} label="風速" value={`${heatRisk.windSpeed.toFixed(1)}m/s`} />
+                <WeatherCard icon={<SunMedium size={16} className="text-orange-500" />} label="UV" value={`${heatRisk.uvIndex.toFixed(1)}`} />
+                <WeatherCard icon={<AlertTriangle size={16} className="text-rose-500" />} label="体感" value={`${heatRisk.apparentTemperature.toFixed(1)}℃`} />
+                <WeatherCard icon={<Waves size={16} className="text-cyan-500" />} label="湿度" value={`${heatRisk.humidity}%`} />
+                <WeatherCard icon={<Route size={16} className="text-emerald-600" />} label="WBGT" value={`${heatRisk.wbgt.toFixed(1)}`} />
+              </div>
+              <p className="mt-2 text-[10px] text-slate-500">{heatRisk.source}</p>
             </div>
           )}
 
+          <form className="flex gap-2" onSubmit={handleStationSearch}>
+            <label className="flex min-h-11 flex-1 items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
+              <Navigation size={18} className="text-aqua-400" />
+              <input
+                className="w-full bg-transparent text-base outline-none"
+                placeholder="現在地（駅・コンビニ・建物など）"
+                value={locationQuery}
+                onChange={(event) => setLocationQuery(event.target.value)}
+              />
+            </label>
+            <button className="min-h-11 rounded-2xl bg-gradient-to-r from-aqua-500 to-frost-500 px-4 text-sm font-semibold text-white shadow-frost">設定</button>
+          </form>
+
+          <form className="relative flex gap-2" onSubmit={handleSearchSubmit}>
+            <label className="flex min-h-11 flex-1 items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
+              <Search size={18} className="text-aqua-400" />
+              <input
+                className="w-full bg-transparent text-base outline-none"
+                placeholder="クーリングシェルター・給水スポットを検索"
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onFocus={() => setShowSearchSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
+              />
+            </label>
+            <button className="min-h-11 rounded-2xl bg-ink px-4 text-sm font-semibold text-white">検索</button>
+            {showSearchSuggestions && searchSuggestions.length > 0 && (
+              <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
+                {searchSuggestions.map((item) => {
+                  const dist = turf.distance([mapCenter.lng, mapCenter.lat], [item.position.lng, item.position.lat], { units: "kilometers" });
+                  return (
+                    <button
+                      key={item.id}
+                      type="button"
+                      className="w-full border-b border-slate-100 px-3 py-2 text-left text-sm last:border-b-0 hover:bg-aqua-50"
+                      onMouseDown={() => handleSuggestionSelect(item)}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="font-semibold">{item.name}</div>
+                          {"type" in item && <div className="text-xs text-slate-500">{item.type === "park" ? "公園" : "給水スポット"}</div>}
+                        </div>
+                        <div className="ml-2 text-xs text-slate-400">{dist.toFixed(2)} km</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </form>
+
           <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
+            className={`flex min-h-11 w-full items-center justify-between rounded-2xl border px-3 text-sm font-semibold transition-all ${
               showBuildingShade
-                ? "border-slate-700 bg-slate-800 text-white"
-                : "border-slate-200 bg-white text-slate-700"
+                ? "border-glacial-700 bg-gradient-to-r from-glacial-800 to-glacial-900 text-white"
+                : "border-glacial-200 bg-white/80 text-glacial-600 hover:border-aqua-200 hover:bg-aqua-50/50"
             }`}
             onClick={() => setShowBuildingShade((current) => !current)}
           >
@@ -286,7 +375,7 @@ export function App() {
         )}
 
         {message && (
-          <div className="mx-4 mt-3 rounded-md bg-slate-900 px-3 py-2 text-sm text-white">
+          <div className="mx-4 mt-3 animate-fade-in rounded-2xl bg-gradient-to-r from-glacial-800 to-glacial-900 px-4 py-3 text-sm text-white shadow-lg">
             {message}
           </div>
         )}
@@ -539,6 +628,16 @@ function Info({ label, value }: { label: string; value: string }) {
     <div className="rounded-md bg-slate-50 p-2">
       <p className="text-xs text-slate-500">{label}</p>
       <p className="font-semibold">{value}</p>
+    </div>
+  );
+}
+
+function WeatherCard({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
+  return (
+    <div className="rounded-md border border-amber-100 bg-white/70 p-2 text-center shadow-sm">
+      <div className="mb-1 flex justify-center">{icon}</div>
+      <div className="text-[10px] text-slate-500">{label}</div>
+      <div className="font-bold text-slate-800">{value}</div>
     </div>
   );
 }

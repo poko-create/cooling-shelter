@@ -67,6 +67,11 @@ export type RouteScore = {
 export type HeatRisk = {
   level: "注意" | "警戒" | "厳重警戒" | "危険";
   score: number;
+  temperature: number;
+  humidity: number;
+  windSpeed: number;
+  apparentTemperature: number;
+  uvIndex: number;
   wbgt: number;
   observedAt: string;
   source: string;

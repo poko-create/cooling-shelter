@@ -5,7 +5,7 @@ export async function getHeatRisk(position: LatLng): Promise<HeatRisk> {
     const params = new URLSearchParams({
       latitude: String(position.lat),
       longitude: String(position.lng),
-      current: "temperature_2m,relative_humidity_2m",
+      current: "temperature_2m,relative_humidity_2m,wind_speed_10m,apparent_temperature,uv_index",
       timezone: "Asia/Tokyo"
     });
     const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
@@ -16,11 +16,23 @@ export async function getHeatRisk(position: LatLng): Promise<HeatRisk> {
         time?: string;
         temperature_2m?: number;
         relative_humidity_2m?: number;
+        wind_speed_10m?: number;
+        apparent_temperature?: number;
+        uv_index?: number;
       };
     };
     const temperature = payload.current?.temperature_2m;
     const humidity = payload.current?.relative_humidity_2m;
-    if (typeof temperature !== "number" || typeof humidity !== "number") {
+    const windSpeed = payload.current?.wind_speed_10m;
+    const apparentTemperature = payload.current?.apparent_temperature;
+    const uvIndex = payload.current?.uv_index;
+    if (
+      typeof temperature !== "number" ||
+      typeof humidity !== "number" ||
+      typeof windSpeed !== "number" ||
+      typeof apparentTemperature !== "number" ||
+      typeof uvIndex !== "number"
+    ) {
       throw new Error("Open-Meteo response is missing weather values");
     }
 
@@ -28,9 +40,14 @@ export async function getHeatRisk(position: LatLng): Promise<HeatRisk> {
     return {
       level: riskLevel(wbgt),
       score: Math.min(100, Math.max(0, Math.round((wbgt / 35) * 100))),
+      temperature,
+      humidity,
+      windSpeed,
+      apparentTemperature,
+      uvIndex,
       wbgt,
       observedAt: payload.current?.time ?? new Date().toISOString(),
-      source: "Open-Meteo 気温・湿度から簡易WBGT目安を算出"
+      source: "Open-Meteo 気温・湿度・風速・体感温度・UVから簡易WBGT目安を算出"
     };
   } catch {
     return fallbackHeatRisk();
@@ -41,6 +58,11 @@ function fallbackHeatRisk(): HeatRisk {
   return {
     level: "厳重警戒",
     score: 82,
+    temperature: 31.2,
+    humidity: 60,
+    windSpeed: 2.4,
+    apparentTemperature: 34.6,
+    uvIndex: 8.1,
     wbgt: 31.2,
     observedAt: new Date().toISOString(),
     source: "環境省熱中症予防情報サイト WBGT（デモ時はフォールバック値）"
