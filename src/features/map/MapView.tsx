@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import L from "leaflet";
 import { statusLabels, statusMarkerColors, statusShapes } from "../../services/status";
-import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter } from "../../types/domain";
+import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter, Poi } from "../../types/domain";
 
 type Props = {
   center: LatLng;
@@ -9,19 +9,18 @@ type Props = {
   shelters: Shelter[];
   availability: Map<string, Availability>;
   restSpots: RestSpot[];
+  convenienceStores: Poi[];
   buildingShadows: BuildingShadow[];
   showBuildingShade: boolean;
+  showConvenienceStores: boolean;
+  showParkSpots: boolean;
+  showWaterSpots: boolean;
   destination: Destination | null;
   bestRoute: RouteCandidate | null;
   shortestRoute: RouteCandidate | null;
   onShelterSelect: (shelter: Shelter) => void;
+  onPoiSelect: (poi: Poi) => void;
   onMapTap: (position: LatLng) => void;
-};
-
-const modernMarkerColors: Record<string, string> = {
-  open: "#06b6d4",
-  busy: "#fbbf24",
-  full: "#94a3b8"
 };
 
 export function MapView({
@@ -30,12 +29,17 @@ export function MapView({
   shelters,
   availability,
   restSpots,
+  convenienceStores,
   buildingShadows,
   showBuildingShade,
+  showConvenienceStores,
+  showParkSpots,
+  showWaterSpots,
   destination,
   bestRoute,
   shortestRoute,
   onShelterSelect,
+  onPoiSelect,
   onMapTap
 }: Props) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
@@ -49,9 +53,9 @@ export function MapView({
       zoomControl: false
     }).setView([center.lat, center.lng], zoom);
 
-    L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+      attribution: "&copy; OpenStreetMap contributors"
     }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
@@ -73,18 +77,18 @@ export function MapView({
     if (showBuildingShade) {
       buildingShadows.forEach((item) => {
         L.polygon(item.shadow.map((point) => [point.lat, point.lng]), {
-          color: "#0e7490",
-          fillColor: "#0e7490",
-          fillOpacity: 0.18,
-          opacity: 0.25,
+          color: "#1e293b",
+          fillColor: "#1e293b",
+          fillOpacity: 0.36,
+          opacity: 0.46,
           weight: 0
         }).bindTooltip(`${item.name} / ${item.source}`).addTo(layer);
 
         L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
-          color: "#94a3b8",
-          fillColor: "#e2e8f0",
-          fillOpacity: 0.2,
-          opacity: 0.5,
+          color: "#64748b",
+          fillColor: "#cbd5e1",
+          fillOpacity: 0.24,
+          opacity: 0.6,
           weight: 1
         }).bindTooltip(`${item.name} / 建物高さ 約${item.heightMeters}m`).addTo(layer);
       });
@@ -92,20 +96,17 @@ export function MapView({
 
     L.circleMarker([center.lat, center.lng], {
       radius: 8,
-      color: "#0891b2",
-      fillColor: "#06b6d4",
-      fillOpacity: 0.9,
-      weight: 2,
-      opacity: 0.8
+      color: "#075985",
+      fillColor: "#0ea5e9",
+      fillOpacity: 0.9
     }).bindTooltip("現在地").addTo(layer);
 
     shelters.forEach((shelter) => {
       const status = availability.get(shelter.id)?.status ?? "open";
-      const color = modernMarkerColors[status];
       const marker = L.marker([shelter.position.lat, shelter.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="map-pin" style="background: linear-gradient(135deg, ${color} 0%, ${color}dd 100%)"><span>${statusShapes[status]}</span></div>`,
+          html: `<div class="map-pin" style="background:${statusMarkerColors[status]}"><span>${statusShapes[status]}</span></div>`,
           iconSize: [34, 34],
           iconAnchor: [17, 17]
         })
@@ -118,33 +119,49 @@ export function MapView({
 
     restSpots.forEach((spot) => {
       const isPark = spot.type === "park";
-      const gradient = isPark
-        ? "linear-gradient(135deg, #14b8a6 0%, #0d9488 100%)"
-        : "linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%)";
+      if (isPark && !showParkSpots) return;
+      if (!isPark && !showWaterSpots) return;
+
       L.marker([spot.position.lat, spot.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="rest-pin" style="background: ${gradient}">${isPark ? "木" : "水"}</div>`,
+          html: `<div class="rest-pin ${isPark ? "rest-pin-park" : "rest-pin-water"}">${isPark ? "木" : "水"}</div>`,
           iconSize: [30, 30],
           iconAnchor: [15, 15]
         })
       }).bindTooltip(`${spot.name} / ${spot.source}`).addTo(layer);
     });
 
+    if (showConvenienceStores) {
+      (convenienceStores || []).forEach((p) => {
+        const marker = L.marker([p.position.lat, p.position.lng], {
+          icon: L.divIcon({
+            className: "",
+            html: `<div class="conv-pin">CV</div>`,
+            iconSize: [28, 28],
+            iconAnchor: [14, 14]
+          })
+        });
+        marker.bindTooltip(`${p.name} / ${p.source}`);
+        marker.on("click", () => onPoiSelect(p));
+        marker.addTo(layer);
+      });
+    }
+
     if (shortestRoute) {
       L.polyline(shortestRoute.coordinates.map((point) => [point.lat, point.lng]), {
-        color: "#94a3b8",
-        weight: 4,
-        opacity: 0.6,
-        dashArray: "10 6"
+        color: "#334155",
+        weight: 5,
+        opacity: 0.7,
+        dashArray: "8 8"
       }).addTo(layer);
     }
 
     if (bestRoute) {
       L.polyline(bestRoute.coordinates.map((point) => [point.lat, point.lng]), {
-        color: "#06b6d4",
+        color: "#146b43",
         weight: 6,
-        opacity: 0.85
+        opacity: 0.9
       }).addTo(layer);
     }
 
@@ -158,7 +175,7 @@ export function MapView({
         })
       }).bindTooltip(destination.label).addTo(layer);
     }
-  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, destination, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade]);
+  }, [availability, bestRoute, buildingShadows, center.lat, center.lng, convenienceStores, destination, onPoiSelect, onShelterSelect, restSpots, shelters, shortestRoute, showBuildingShade, showConvenienceStores, showParkSpots, showWaterSpots]);
 
-  return <div ref={nodeRef} className="h-full min-h-[54vh] w-full rounded-none" />;
+  return <div ref={nodeRef} className="h-full min-h-[54vh] w-full" />;
 }
