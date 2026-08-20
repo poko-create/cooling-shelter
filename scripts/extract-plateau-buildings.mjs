@@ -6,12 +6,12 @@ const TILESET_URL =
 const TILESET_BASE = TILESET_URL.replace(/tileset\.json$/, "");
 const OUTPUT = "src/data/plateau/kotoDemoBuildings.json";
 const TARGET_BOUNDS = {
-  minLng: 139.795,
-  maxLng: 139.836,
-  minLat: 35.668,
-  maxLat: 35.681
+  minLng: 139.76,
+  maxLng: 139.86,
+  minLat: 35.6,
+  maxLat: 35.72
 };
-const MAX_BUILDINGS = 700;
+const MAX_BUILDINGS = 3000;
 
 const tileset = await fetchJson(TILESET_URL);
 const tileUrls = [];

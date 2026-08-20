@@ -1,6 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import L from "leaflet";
-import { LocateFixed } from "lucide-react";
+import { Building2, LocateFixed, Snowflake, Store, Trees, Waves } from "lucide-react";
 import { statusLabels, statusMarkerColors, statusShapes } from "../../services/status";
 import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter, Poi } from "../../types/domain";
 
@@ -26,6 +26,11 @@ type Props = {
   onPoiSelect: (poi: Poi) => void;
   onRestSpotSelect: (spot: RestSpot) => void;
   onMapTap: (position: LatLng) => void;
+  onToggleBuildingShade: () => void;
+  onToggleShelters: () => void;
+  onToggleConvenienceStores: () => void;
+  onToggleParkSpots: () => void;
+  onToggleWaterSpots: () => void;
 };
 
 export function MapView({
@@ -49,7 +54,12 @@ export function MapView({
   onShelterSelect,
   onPoiSelect,
   onRestSpotSelect,
-  onMapTap
+  onMapTap,
+  onToggleBuildingShade,
+  onToggleShelters,
+  onToggleConvenienceStores,
+  onToggleParkSpots,
+  onToggleWaterSpots
 }: Props) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -155,7 +165,7 @@ export function MapView({
         const marker = L.marker([p.position.lat, p.position.lng], {
           icon: L.divIcon({
             className: "",
-            html: `<div class="conv-pin">CV</div>`,
+            html: `<div class="conv-pin"><svg xmlns="http://www.w3.org/2000/svg" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m2 7 4.4-4.4A2 2 0 0 1 7.8 2h8.4a2 2 0 0 1 1.4.6L22 7"/><path d="M4 7v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7"/><path d="M8 22v-8h8v8"/><path d="M2 7h20"/><path d="M7 7v3a2 2 0 0 1-4 0V7"/><path d="M12 7v3a2 2 0 0 1-4 0V7"/><path d="M17 7v3a2 2 0 0 1-4 0V7"/><path d="M22 7v3a2 2 0 0 1-4 0V7"/></svg></div>`,
             iconSize: [20, 20],
             iconAnchor: [10, 10]
           })
@@ -194,7 +204,7 @@ export function MapView({
       L.marker([destinationMarker.position.lat, destinationMarker.position.lng], {
         icon: L.divIcon({
           className: "",
-          html: `<div class="destination-pin">目</div>`,
+          html: `<div class="destination-pin"><svg xmlns="http://www.w3.org/2000/svg" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/></svg></div>`,
           iconSize: [24, 24],
           iconAnchor: [12, 24]
         })
@@ -203,8 +213,50 @@ export function MapView({
   }, [availability, bestRoute, buildingShadows, center.lat, center.lng, convenienceStores, currentPosition.lat, currentPosition.lng, destination, onPoiSelect, onRestSpotSelect, onShelterSelect, restSpots, selectedMapTap, shelters, shortestRoute, showBuildingShade, showConvenienceStores, showParkSpots, showShelters, showWaterSpots]);
 
   return (
-    <div className="relative h-full min-h-[54vh] w-full">
-      <div ref={nodeRef} className="h-full min-h-[54vh] w-full" />
+    <div className="relative h-full min-h-[62vh] w-full">
+      <div ref={nodeRef} className="h-full min-h-[62vh] w-full" />
+      <div className="absolute left-1/2 top-3 z-[900] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/50 bg-white/65 px-1.5 py-1 shadow-lg backdrop-blur-md">
+        <LayerToggleButton
+          active={showBuildingShade}
+          label="建物日陰の目安"
+          activeClassName="border-glacial-800 bg-glacial-900 text-white"
+          onClick={onToggleBuildingShade}
+        >
+          <Building2 size={14} />
+        </LayerToggleButton>
+        <LayerToggleButton
+          active={showShelters}
+          label="クーリングシェルター"
+          activeClassName="border-aqua-600 bg-aqua-600 text-white"
+          onClick={onToggleShelters}
+        >
+          <Snowflake size={14} />
+        </LayerToggleButton>
+        <LayerToggleButton
+          active={showConvenienceStores}
+          label="コンビニ"
+          activeClassName="border-orange-500 bg-orange-500 text-white"
+          onClick={onToggleConvenienceStores}
+        >
+          <Store size={14} />
+        </LayerToggleButton>
+        <LayerToggleButton
+          active={showParkSpots}
+          label="公園"
+          activeClassName="border-emerald-600 bg-emerald-600 text-white"
+          onClick={onToggleParkSpots}
+        >
+          <Trees size={14} />
+        </LayerToggleButton>
+        <LayerToggleButton
+          active={showWaterSpots}
+          label="給水スポット"
+          activeClassName="border-sky-500 bg-sky-500 text-white"
+          onClick={onToggleWaterSpots}
+        >
+          <Waves size={14} />
+        </LayerToggleButton>
+      </div>
       <button
         type="button"
         aria-label="現在地に戻る"
@@ -217,5 +269,38 @@ export function MapView({
         <LocateFixed size={17} />
       </button>
     </div>
+  );
+}
+
+function LayerToggleButton({
+  active,
+  label,
+  activeClassName,
+  children,
+  onClick
+}: {
+  active: boolean;
+  label: string;
+  activeClassName: string;
+  children: ReactNode;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      className={`flex h-7 w-7 items-center justify-center rounded-full border transition ${
+        active
+          ? `${activeClassName} shadow-sm`
+          : "border-slate-200 bg-white text-slate-500 opacity-70 hover:bg-slate-50 hover:opacity-100"
+      }`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      {children}
+    </button>
   );
 }

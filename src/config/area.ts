@@ -10,6 +10,13 @@ export const DEMO_CURRENT_POSITION: LatLng = {
   lng: 139.81585
 };
 
+export const DEMO_AREA_BOUNDS = {
+  minLat: 35.6,
+  maxLat: 35.72,
+  minLng: 139.76,
+  maxLng: 139.86
+};
+
 export const TOKYO_FALLBACK_CENTER: LatLng = {
   lat: 35.6812,
   lng: 139.7671

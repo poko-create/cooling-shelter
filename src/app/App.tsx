@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, CloudSun, LocateFixed, Navigation, Route, Search, Snowflake, SunMedium, Trees, Waves, Wind } from "lucide-react";
+import { AlertTriangle, Building2, CloudSun, LocateFixed, MapPin, Navigation, Route, Snowflake, Store, SunMedium, Trees, Waves, Wind } from "lucide-react";
 import * as turf from "@turf/turf";
 import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, DEMO_CURRENT_POSITION, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
@@ -8,7 +8,7 @@ import { updateAvailability } from "../services/availabilityStore";
 import { searchDestination, searchDestinationSuggestions } from "../services/destinationSearch";
 import { getHeatRisk } from "../services/heatRisk";
 import { loadOpenData } from "../services/openData";
-import { getRouteCandidates, restSpotsNearRoute, scoreRoutes } from "../services/routes";
+import { getRouteCandidates, scoreRoutes } from "../services/routes";
 import { statusClasses, statusLabels, statusShapes } from "../services/status";
 import { getDemoBuildingShadows } from "../services/buildingShade";
 import type { AreaMode, Availability, AvailabilityStatus, Destination, HeatRisk, LatLng, RestSpot, RouteCandidate, RouteScore, Shelter, TreePoint, Poi } from "../types/domain";
@@ -51,7 +51,6 @@ export function App() {
   const bestScore = routeScores.find((score) => score.routeId !== "shortest") ?? routeScores[0] ?? null;
   const bestRoute = bestScore ? routes.find((route) => route.id === bestScore.routeId) ?? null : null;
   const shortestRoute = routes.find((route) => route.id === "shortest") ?? null;
-  const routeRestSpots = bestRoute ? restSpotsNearRoute(bestRoute, restSpots) : restSpots;
   const buildingShadows = useMemo(() => getDemoBuildingShadows(), []);
   const [pois, setPois] = useState<Poi[]>([]);
 
@@ -80,6 +79,11 @@ export function App() {
       () => {
         setCurrentPosition(TOKYO_FALLBACK_CENTER);
         setMessage("位置情報を取得できないため、東京都心を現在地として表示しています。");
+        window.setTimeout(() => {
+          setMessage((current) =>
+            current === "位置情報を取得できないため、東京都心を現在地として表示しています。" ? null : current
+          );
+        }, 3500);
       },
       { enableHighAccuracy: true, timeout: 8000 }
     );
@@ -103,20 +107,32 @@ export function App() {
   }, [mapCenter.lat, mapCenter.lng]);
 
   useEffect(() => {
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      fetchConvenienceStores(mapCenter, 800).then(setPois).catch(() => setPois([]));
+      fetchConvenienceStores({ signal: controller.signal }).then((stores) => {
+        if (stores.length > 0) setPois(stores);
+      }).catch(() => {});
     }, 1500);
-    return () => clearTimeout(timer);
-  }, [mapCenter.lat, mapCenter.lng]);
+    return () => {
+      controller.abort();
+      clearTimeout(timer);
+    };
+  }, []);
 
   useEffect(() => {
     if (!destination) return;
 
+    let cancelled = false;
     getRouteCandidates(mapCenter, destination.position).then((nextRoutes) => {
+      if (cancelled) return;
       setRoutes(nextRoutes);
-      setScores(scoreRoutes(nextRoutes, trees, restSpots, buildingShadows));
+      setScores(scoreRoutes(nextRoutes, trees, restSpots, buildingShadows, shelters, pois));
     });
-  }, [buildingShadows, destination, mapCenter.lat, mapCenter.lng, restSpots, trees]);
+
+    return () => {
+      cancelled = true;
+    };
+  }, [buildingShadows, destination, mapCenter.lat, mapCenter.lng, pois, restSpots, shelters, trees]);
 
   const availabilityMap = useMemo(() => {
     return new Map(availability.map((item) => [item.shelterId, item]));
@@ -192,17 +208,17 @@ export function App() {
       return;
     }
 
-    let cancelled = false;
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      searchDestinationSuggestions(q, mapCenter).then((items) => {
-        if (!cancelled) setPlaceSuggestions(items);
+      searchDestinationSuggestions(q, mapCenter, { signal: controller.signal }).then((items) => {
+        setPlaceSuggestions(items);
       }).catch(() => {
-        if (!cancelled) setPlaceSuggestions([]);
+        if (!controller.signal.aborted) setPlaceSuggestions([]);
       });
-    }, 350);
+    }, 500);
 
     return () => {
-      cancelled = true;
+      controller.abort();
       clearTimeout(timer);
     };
   }, [locationQuery, mapCenter.lat, mapCenter.lng, showLocationSuggestions]);
@@ -260,7 +276,7 @@ export function App() {
   return (
     <main className="min-h-screen bg-gradient-to-br from-aqua-50 via-frost-50 to-aqua-100">
       <div className="mx-auto flex min-h-screen w-full max-w-[480px] flex-col bg-white/60 shadow-glass backdrop-blur-sm">
-        <header className="space-y-3 border-b border-aqua-100/50 bg-white/70 px-4 py-4 backdrop-blur-sm">
+        <header className="relative z-[1100] space-y-3 border-b border-aqua-100/50 bg-white/70 px-4 py-4 backdrop-blur-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="flex items-center gap-1 text-xs font-semibold text-aqua-600"><Snowflake size={12} /> 都知事杯オープンデータ・ハッカソン2026</p>
@@ -345,7 +361,7 @@ export function App() {
               />
             </label>
             {showLocationSuggestions && combinedLocationSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
+              <div className="absolute top-full left-0 right-0 z-[1200] mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
                 {combinedLocationSuggestions.map((item) => {
                   const dist = turf.distance([mapCenter.lng, mapCenter.lat], [item.position.lng, item.position.lat], { units: "kilometers" });
                   const name = "label" in item ? item.label : item.name;
@@ -376,10 +392,10 @@ export function App() {
 
           <form className="relative" onSubmit={handleSearchSubmit}>
             <label className="flex min-h-11 w-full items-center gap-2 rounded-2xl border border-aqua-200/60 bg-white/70 px-3 backdrop-blur-sm">
-              <Search size={18} className="text-aqua-400" />
+              <MapPin size={18} className="text-aqua-400" />
               <input
                 className="w-full bg-transparent text-base outline-none"
-                placeholder="クーリングシェルター・給水スポットを検索"
+                placeholder="近くの施設を選択"
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
                 onFocus={() => setShowSearchSuggestions(true)}
@@ -388,7 +404,7 @@ export function App() {
               />
             </label>
             {showSearchSuggestions && searchSuggestions.length > 0 && (
-              <div className="absolute top-full left-0 right-0 z-10 mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
+              <div className="absolute top-full left-0 right-0 z-[1200] mt-1 max-h-60 overflow-y-auto rounded-2xl border border-aqua-100 bg-white shadow-frost">
                 {searchSuggestions.map((item) => {
                   const dist = turf.distance([mapCenter.lng, mapCenter.lat], [item.position.lng, item.position.lat], { units: "kilometers" });
                   let label = '';
@@ -420,86 +436,6 @@ export function App() {
             )}
           </form>
 
-          <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-2xl border px-3 text-sm font-semibold transition-all ${
-              showBuildingShade
-                ? "border-glacial-700 bg-gradient-to-r from-glacial-800 to-glacial-900 text-white"
-                : "border-glacial-200 bg-white/80 text-glacial-600 hover:border-aqua-200 hover:bg-aqua-50/50"
-            }`}
-            onClick={() => setShowBuildingShade((current) => !current)}
-          >
-            <span className="flex items-center gap-2">
-              <Building2 size={18} />
-              建物日陰の目安
-            </span>
-            <span>{showBuildingShade ? "表示中" : "非表示"}</span>
-          </button>
-
-          <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
-              showShelters
-                ? "border-aqua-600 bg-aqua-600 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowShelters((current) => !current)}
-          >
-            <span className="flex items-center gap-2">
-              <Snowflake size={16} />
-              クーリングシェルター
-            </span>
-            <span>{showShelters ? "表示中" : "非表示"}</span>
-          </button>
-
-          <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
-              showConvenienceStores
-                ? "border-orange-500 bg-orange-500 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowConvenienceStores((current) => !current)}
-          >
-            <span className="flex items-center gap-2">
-              <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-white/90 text-[10px] font-black text-orange-500">CV</span>
-              コンビニ
-            </span>
-            <span>{showConvenienceStores ? "表示中" : "非表示"}</span>
-          </button>
-
-          <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
-              showParkSpots
-                ? "border-emerald-600 bg-emerald-600 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowParkSpots((current) => !current)}
-          >
-            <span className="flex items-center gap-2">
-              <Trees size={16} />
-              公園
-            </span>
-            <span>{showParkSpots ? "表示中" : "非表示"}</span>
-          </button>
-
-          <button
-            className={`flex min-h-11 w-full items-center justify-between rounded-md border px-3 text-sm font-semibold ${
-              showWaterSpots
-                ? "border-sky-500 bg-sky-500 text-white"
-                : "border-slate-200 bg-white text-slate-700"
-            }`}
-            onClick={() => setShowWaterSpots((current) => !current)}
-          >
-            <span className="flex items-center gap-2">
-              <Waves size={16} />
-              給水スポット
-            </span>
-            <span>{showWaterSpots ? "表示中" : "非表示"}</span>
-          </button>
-
-          {showBuildingShade && (
-            <p className="rounded-md bg-slate-50 px-3 py-2 text-xs text-slate-600">
-              江東区デモ限定の参考レイヤーです。固定日時の建物高さ目安から日陰を面で描画し、ルートの緑陰スコアにも反映しています。
-            </p>
-          )}
         </header>
 
         {areaMode === "current" && shelters.length <= DATA_SPARSE_THRESHOLD && (
@@ -514,14 +450,14 @@ export function App() {
           </div>
         )}
 
-        <section className="min-h-[54vh] flex-1">
+        <section className="min-h-[62vh] flex-1">
           <MapView
             center={mapViewCenter}
             currentPosition={mapCenter}
             zoom={DEFAULT_ZOOM}
             shelters={shelters}
             availability={availabilityMap}
-            restSpots={routeRestSpots}
+            restSpots={restSpots}
             convenienceStores={pois}
             buildingShadows={buildingShadows}
             showBuildingShade={showBuildingShade}
@@ -536,6 +472,11 @@ export function App() {
             onShelterSelect={setSelectedShelter}
             onPoiSelect={setSelectedPoi}
             onRestSpotSelect={setSelectedRestSpot}
+            onToggleBuildingShade={() => setShowBuildingShade((current) => !current)}
+            onToggleShelters={() => setShowShelters((current) => !current)}
+            onToggleConvenienceStores={() => setShowConvenienceStores((current) => !current)}
+            onToggleParkSpots={() => setShowParkSpots((current) => !current)}
+            onToggleWaterSpots={() => setShowWaterSpots((current) => !current)}
             onMapTap={(position) => {
               setSelectedMapTap(position);
               setSelectedShelter(null);
@@ -636,13 +577,48 @@ function MapTapSheet({
 
 function Legend() {
   return (
-    <div className="grid grid-cols-3 gap-2 border-t border-emerald-100 bg-white px-4 py-3 text-xs">
-      <span><span className="text-sky-600">●</span> 空き</span>
-      <span><span className="text-warning">▲</span> やや混雑</span>
-      <span><span className="text-slate-500">■</span> 満員</span>
-      <span className="flex items-center gap-1"><Trees size={14} /> 公園</span>
-      <span className="flex items-center gap-1"><Waves size={14} /> 給水</span>
-      <span className="flex items-center gap-1"><Building2 size={14} /> 建物日陰</span>
+    <div className="grid grid-cols-4 gap-x-2 gap-y-2 border-t border-emerald-100 bg-white px-4 py-3 text-[11px] leading-tight text-slate-700">
+      <span className="flex items-center gap-1">
+        <span className="h-3 w-3 rounded-sm bg-slate-800/60" />
+        建物日陰
+      </span>
+      <span className="flex items-center gap-1">
+        <Snowflake size={13} className="text-aqua-600" />
+        シェルター
+      </span>
+      <span className="flex items-center gap-1">
+        <Store size={13} className="text-orange-500" />
+        コンビニ
+      </span>
+      <span className="flex items-center gap-1">
+        <Trees size={13} className="text-emerald-600" />
+        公園
+      </span>
+      <span className="flex items-center gap-1">
+        <Waves size={13} className="text-sky-500" />
+        給水
+      </span>
+      <span className="flex items-center gap-1">
+        <LocateFixed size={13} className="text-blue-600" />
+        現在地
+      </span>
+      <span className="flex items-center gap-1">
+        <MapPin size={13} className="text-slate-950" />
+        目的地
+      </span>
+      <span className="flex min-w-0 items-center gap-1">
+        <Route size={13} className="text-slate-500" />
+        <span className="flex min-w-0 flex-col gap-0.5">
+          <span className="flex items-center gap-1">
+            <span className="h-0 w-5 border-t-2 border-dashed border-sky-500" />
+            涼
+          </span>
+          <span className="flex items-center gap-1">
+            <span className="h-0 w-5 border-t-2 border-dashed border-emerald-700" />
+            最短
+          </span>
+        </span>
+      </span>
     </div>
   );
 }

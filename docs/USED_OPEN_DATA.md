@@ -73,8 +73,8 @@
 	- 提供元: OpenStreetMap community
 	- URL: https://overpass-api.de/
 	- 実装箇所: `src/services/places.ts`, `src/services/destinationSearch.ts`
-	- 用途: 近隣コンビニ取得、店舗・施設名検索候補
-	- 備考: OpenStreetMapデータを利用。検索欄では地図中心から約5km以内の `name` / `brand` を検索
+	- 用途: 江東区デモ範囲のコンビニ取得、店舗・施設名検索候補
+	- 備考: OpenStreetMapデータを利用。コンビニは江東区デモ範囲の bbox で取得し、検索欄では地図中心から約5km以内の `name` / `brand` を検索
 
 - Open-Meteo
 	- 提供元: Open-Meteo

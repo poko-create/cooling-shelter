@@ -1,6 +1,6 @@
 import * as turf from "@turf/turf";
-import { BUILDING_SHADE_SAMPLE_METERS, ROUTE_BUFFER_METERS, SCORING_WEIGHTS } from "../config/scoring";
-import type { BuildingShadow, LatLng, RestSpot, RouteCandidate, RouteScore } from "../types/domain";
+import { BUILDING_SHADE_SAMPLE_METERS, ROUTE_BUFFER_METERS, SCORING_WEIGHTS, TREE_ROUTE_BUFFER_METERS } from "../config/scoring";
+import type { BuildingShadow, LatLng, Poi, RestSpot, RouteCandidate, RouteScore, Shelter } from "../types/domain";
 import type { TreePoint } from "../types/domain";
 
 function distanceMeters(from: LatLng, to: LatLng) {
@@ -313,7 +313,9 @@ export function scoreRoutes(
   routes: RouteCandidate[],
   trees: TreePoint[],
   restSpots: RestSpot[],
-  buildingShadows: BuildingShadow[] = []
+  buildingShadows: BuildingShadow[] = [],
+  shelters: Shelter[] = [],
+  convenienceStores: Poi[] = []
 ): RouteScore[] {
   const greenSpots = filterGreenRestSpots(restSpots);
   const shortestMinutes = Math.min(...routes.map((route) => route.durationMinutes));
@@ -321,10 +323,19 @@ export function scoreRoutes(
     routes.map((route) => {
       const treeCount = countNearRoute(route, trees);
       const nearRest = restSpotsNearRoute(route, greenSpots);
+      const nearShelters = placesNearRoute(route, shelters);
+      const nearConvenienceStores = placesNearRoute(route, convenienceStores);
       const parkCount = nearRest.filter((spot) => spot.type === "park").length;
       const waterCount = nearRest.filter((spot) => spot.type === "water").length;
+      const shelterCount = nearShelters.length;
+      const convenienceStoreCount = nearConvenienceStores.length;
       const routeKilometers = Math.max(0.1, route.distanceMeters / 1000);
       const buildingShadeMeters = routeBuildingShadeMeters(route, buildingShadows);
+      const restAccessScore =
+        parkCount * 0.1 +
+        waterCount * 0.3 +
+        shelterCount * 0.4 +
+        convenienceStoreCount * 0.2;
 
       return [route.id, {
         treeCount,
@@ -333,7 +344,9 @@ export function scoreRoutes(
         buildingShadeRatio: Math.min(1, buildingShadeMeters / Math.max(1, route.distanceMeters)),
         parkCount,
         waterCount,
-        restDensityPerKm: (parkCount + waterCount) / routeKilometers
+        shelterCount,
+        convenienceStoreCount,
+        restDensityPerKm: restAccessScore / routeKilometers
       }];
     })
   );
@@ -356,6 +369,8 @@ export function scoreRoutes(
       buildingShadeRatio: 0,
       parkCount: 0,
       waterCount: 0,
+      shelterCount: 0,
+      convenienceStoreCount: 0,
       restDensityPerKm: 0
     };
     const extraMinutes = Math.max(0, route.durationMinutes - shortestMinutes);
@@ -383,6 +398,15 @@ export function scoreRoutes(
       buildingShadeRatio: metrics.buildingShadeRatio,
       parkCount: metrics.parkCount,
       waterCount: metrics.waterCount,
+      shelterCount: metrics.shelterCount,
+      convenienceStoreCount: metrics.convenienceStoreCount,
+      subScores: {
+        tree: Math.round(treeScore),
+        buildingShade: Math.round(buildingShadeScore),
+        park: Math.round(parkScore),
+        rest: Math.round(restScore),
+        detour: Math.round(detourScore)
+      },
       extraMinutes,
       reasons: buildReasons(route, metrics, extraMinutes)
     };
@@ -398,11 +422,15 @@ const demoWaypointCandidates: DemoNodeId[] = [
 ];
 
 export function restSpotsNearRoute(route: RouteCandidate, restSpots: RestSpot[]): RestSpot[] {
+  return placesNearRoute(route, restSpots);
+}
+
+function placesNearRoute<T extends { position: LatLng }>(route: RouteCandidate, places: T[]): T[] {
   const line = turf.lineString(route.coordinates.map((point) => [point.lng, point.lat]));
-  return restSpots.filter((spot) => {
-    const point = turf.point([spot.position.lng, spot.position.lat]);
+  return places.filter((place) => {
+    const point = turf.point([place.position.lng, place.position.lat]);
     const distance = turf.pointToLineDistance(point, line, { units: "meters" });
-    return distance <= ROUTE_BUFFER_METERS * 4;
+    return distance <= ROUTE_BUFFER_METERS;
   });
 }
 
@@ -411,7 +439,7 @@ function countNearRoute(route: RouteCandidate, items: Array<TreePoint | RestSpot
 
   return items.filter((item) => {
     const point = turf.point([item.position.lng, item.position.lat]);
-    return turf.pointToLineDistance(point, line, { units: "meters" }) <= ROUTE_BUFFER_METERS;
+    return turf.pointToLineDistance(point, line, { units: "meters" }) <= TREE_ROUTE_BUFFER_METERS;
   }).length;
 }
 
@@ -455,15 +483,19 @@ function buildReasons(route: RouteCandidate, metrics: {
   buildingShadeRatio: number;
   parkCount: number;
   waterCount: number;
+  shelterCount: number;
+  convenienceStoreCount: number;
 }, extraMinutes: number) {
   const reasons = [
-    `${route.label}はルート周辺の街路樹密度が約${metrics.treeDensityPerKm.toFixed(1)}本/kmです`,
     `建物日陰の目安と重なる区間が約${Math.round(metrics.buildingShadeMeters)}m（ルートの約${Math.round(metrics.buildingShadeRatio * 100)}%）あります`,
-    `最短ルートとの差分は約${extraMinutes}分です`
+    `ルート周辺20m以内の街路樹密度が約${metrics.treeDensityPerKm.toFixed(1)}本/kmです`
   ];
 
-  if (metrics.parkCount > 0) reasons.push(`緑陰の多い公園を${metrics.parkCount}か所通ります`);
-  if (metrics.waterCount > 0) reasons.push(`給水スポットが${metrics.waterCount}か所あります`);
+  if (metrics.parkCount > 0) reasons.push(`ルート周辺50m以内に公園が${metrics.parkCount}か所あります`);
+  if (metrics.waterCount > 0) reasons.push(`ルート周辺50m以内に給水スポットが${metrics.waterCount}か所あります`);
+  if (metrics.shelterCount > 0) reasons.push(`ルート周辺50m以内にクーリングシェルターが${metrics.shelterCount}か所あります`);
+  if (metrics.convenienceStoreCount > 0) reasons.push(`ルート周辺50m以内にコンビニが${metrics.convenienceStoreCount}か所あります`);
+  reasons.push(`最短ルートとの差分は約${extraMinutes}分です`);
 
   return reasons;
 }

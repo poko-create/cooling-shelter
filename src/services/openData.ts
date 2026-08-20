@@ -1,13 +1,7 @@
+import { DEMO_AREA_BOUNDS } from "../config/area";
 import { mockRestSpots, mockShelters, mockTrees } from "../data/mock/shelters";
 import type { RestSpot, Shelter, TreePoint } from "../types/domain";
 import { parseCsv, rowsToObjects } from "./csv";
-
-const KOTO_BOUNDS = {
-  minLat: 35.6,
-  maxLat: 35.72,
-  minLng: 139.76,
-  maxLng: 139.86
-};
 
 const OPEN_DATA_API_BASE = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
@@ -150,10 +144,10 @@ function toNumber(value: string | undefined) {
 function isInKotoBounds(lat: number, lng: number) {
   return Number.isFinite(lat) &&
     Number.isFinite(lng) &&
-    lat >= KOTO_BOUNDS.minLat &&
-    lat <= KOTO_BOUNDS.maxLat &&
-    lng >= KOTO_BOUNDS.minLng &&
-    lng <= KOTO_BOUNDS.maxLng;
+    lat >= DEMO_AREA_BOUNDS.minLat &&
+    lat <= DEMO_AREA_BOUNDS.maxLat &&
+    lng >= DEMO_AREA_BOUNDS.minLng &&
+    lng <= DEMO_AREA_BOUNDS.maxLng;
 }
 
 function extractCapacity(value: string) {

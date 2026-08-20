@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { mockTrees } from "../src/data/mock/shelters";
 import { filterGreenRestSpots, getRouteCandidates, scoreRoutes } from "../src/services/routes";
-import type { BuildingShadow, RouteCandidate } from "../src/types/domain";
+import type { BuildingShadow, Poi, RouteCandidate, Shelter } from "../src/types/domain";
 
 describe("demo pedestrian fallback routes", () => {
   beforeEach(() => {
@@ -147,5 +147,52 @@ describe("demo pedestrian fallback routes", () => {
     expect(longPartialShade?.buildingShadeMeters).toBeGreaterThan(shortShady?.buildingShadeMeters ?? 0);
     expect(shortShady?.buildingShadeRatio).toBeGreaterThan(longPartialShade?.buildingShadeRatio ?? 0);
     expect(shortShady?.shadeScore).toBeGreaterThan(longPartialShade?.shadeScore ?? 0);
+  });
+
+  it("includes shelters and convenience stores in the water and rest score", () => {
+    const routes: RouteCandidate[] = [
+      {
+        id: "plain",
+        label: "通常ルート",
+        coordinates: [{ lat: 35.006, lng: 139.0 }, { lat: 35.006, lng: 139.004 }],
+        distanceMeters: 360,
+        durationMinutes: 5,
+        source: "demo-fallback"
+      },
+      {
+        id: "rest-access",
+        label: "休憩しやすいルート",
+        coordinates: [{ lat: 35.001, lng: 139.0 }, { lat: 35.001, lng: 139.004 }],
+        distanceMeters: 360,
+        durationMinutes: 5,
+        source: "demo-fallback"
+      }
+    ];
+    const shelters: Shelter[] = [{
+      id: "shelter-1",
+      name: "シェルター",
+      address: "test",
+      capacity: 20,
+      openHours: "9:00-17:00",
+      position: { lat: 35.001, lng: 139.002 },
+      source: "test"
+    }];
+    const convenienceStores: Poi[] = [{
+      id: "convenience-1",
+      name: "コンビニ",
+      category: "convenience",
+      position: { lat: 35.001, lng: 139.003 },
+      source: "test"
+    }];
+
+    const scores = scoreRoutes(routes, [], [], [], shelters, convenienceStores);
+    const plain = scores.find((score) => score.routeId === "plain");
+    const restAccess = scores.find((score) => score.routeId === "rest-access");
+
+    expect(restAccess?.shelterCount).toBe(1);
+    expect(restAccess?.convenienceStoreCount).toBe(1);
+    expect(restAccess?.shadeScore).toBeGreaterThan(plain?.shadeScore ?? 0);
+    expect(restAccess?.reasons).toContain("ルート周辺50m以内にクーリングシェルターが1か所あります");
+    expect(restAccess?.reasons).toContain("ルート周辺50m以内にコンビニが1か所あります");
   });
 });

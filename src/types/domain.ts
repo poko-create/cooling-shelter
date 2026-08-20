@@ -63,6 +63,15 @@ export type RouteScore = {
   buildingShadeRatio: number;
   parkCount: number;
   waterCount: number;
+  shelterCount: number;
+  convenienceStoreCount: number;
+  subScores: {
+    tree: number;
+    buildingShade: number;
+    park: number;
+    rest: number;
+    detour: number;
+  };
   extraMinutes: number;
   reasons: string[];
 };
