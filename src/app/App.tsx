@@ -885,16 +885,16 @@ function LayerToggle({
 }) {
   return (
     <button
-      className={`flex flex-1 min-h-8 items-center justify-center gap-1 rounded-xl px-1 py-1 text-[10px] font-bold transition-all duration-200 ${
+      className={`flex flex-1 items-center justify-center gap-1 rounded-xl px-1.5 py-[5px] text-[10px] font-bold transition-all duration-200 ${
         active
           ? `${activeColor} text-white shadow-sm`
-          : "bg-aqua-50 text-aqua-700 hover:bg-aqua-100"
+          : "bg-glacial-50 text-glacial-400 hover:bg-glacial-100 hover:text-glacial-500 opacity-50 hover:opacity-70"
       }`}
       onClick={onClick}
-      title={label}
+      title={active ? `地図から${label}を非表示にする` : `地図に${label}を表示する`}
     >
       {icon}
-      <span className="hidden min-[380px]:inline leading-none">{label}</span>
+      <span className="leading-none">{label}</span>
     </button>
   );
 }
