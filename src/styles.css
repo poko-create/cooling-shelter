@@ -17,7 +17,7 @@ body {
     sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background: linear-gradient(135deg, #ecfeff 0%, #f0fdfa 50%, #f0f9ff 100%);
+  background: linear-gradient(160deg, #ecfeff 0%, #e0f2fe 30%, #f0fdfa 60%, #f0f9ff 100%);
 }
 
 @layer components {
@@ -44,11 +44,17 @@ body {
   }
 
   .gradient-frost {
-    background: linear-gradient(160deg, #ecfeff 0%, #ccfbf1 40%, #f0fdfa 100%);
+    background: linear-gradient(160deg, #ecfeff 0%, #e0f2fe 35%, #ccfbf1 70%, #f0fdfa 100%);
   }
 
   .gradient-water {
     background: linear-gradient(135deg, #22d3ee 0%, #06b6d4 100%);
+  }
+
+  .gradient-header {
+    background: linear-gradient(135deg, rgba(204,251,241,0.95) 0%, rgba(165,243,252,0.9) 40%, rgba(224,242,254,0.92) 100%);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
   }
 
   .btn-cool {
@@ -87,34 +93,49 @@ body {
   }
 
   .input-frost {
-    @apply w-full rounded-2xl border border-aqua-200/60 bg-white/70 px-4 py-3 text-sm text-ink outline-none transition-all duration-300;
-    backdrop-filter: blur(8px);
+    @apply w-full rounded-2xl border border-aqua-200/50 bg-white/60 px-4 py-3 text-sm text-ink outline-none transition-all duration-300;
+    backdrop-filter: blur(12px);
   }
 
   .input-frost:focus {
-    border-color: #06b6d4;
-    box-shadow: 0 0 0 3px rgba(6, 182, 212, 0.12);
-    background: rgba(255, 255, 255, 0.9);
+    border-color: rgba(6, 182, 212, 0.5);
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.08), 0 2px 12px rgba(6, 182, 212, 0.06);
+    background: rgba(255, 255, 255, 0.85);
   }
 
   .input-frost::placeholder {
     color: #94a3b8;
   }
 
+  .sheet {
+    @apply rounded-t-3xl p-5 pb-8;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(24px) saturate(200%);
+    -webkit-backdrop-filter: blur(24px) saturate(200%);
+    box-shadow: 0 -4px 40px rgba(6, 182, 212, 0.12), 0 -1px 12px rgba(15, 23, 42, 0.04);
+    border-top: 1px solid rgba(6, 182, 212, 0.15);
+  }
+
+  .sheet-handle {
+    @apply mx-auto mb-4 h-1 w-10 rounded-full;
+    background: linear-gradient(90deg, rgba(6, 182, 212, 0.35) 0%, rgba(13, 148, 136, 0.3) 100%);
+  }
+
   .toggle-track {
-    @apply relative h-6 w-11 cursor-pointer rounded-full transition-colors duration-300;
+    @apply relative h-7 w-12 cursor-pointer rounded-full transition-all duration-300;
   }
 
   .toggle-track.active {
     background: linear-gradient(135deg, #06b6d4 0%, #0d9488 100%);
+    box-shadow: 0 0 12px rgba(6, 182, 212, 0.3);
   }
 
   .toggle-track.inactive {
-    background: #cbd5e1;
+    background: #e2e8f0;
   }
 
   .toggle-knob {
-    @apply absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300;
+    @apply absolute top-1 left-1 h-5 w-5 rounded-full bg-white shadow-sm transition-transform duration-300;
   }
 
   .toggle-track.active .toggle-knob {
@@ -124,6 +145,30 @@ body {
   .separator-cool {
     @apply h-px w-full;
     background: linear-gradient(90deg, transparent 0%, rgba(6, 182, 212, 0.2) 50%, transparent 100%);
+  }
+
+  .layer-pill {
+    @apply flex min-h-11 w-full items-center justify-between rounded-2xl border px-3.5 py-2 text-sm font-semibold transition-all duration-300;
+  }
+
+  .layer-pill.active {
+    @apply text-white;
+    box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  }
+
+  .layer-pill.inactive {
+    @apply border-slate-200 bg-white/80 text-slate-700;
+    backdrop-filter: blur(8px);
+  }
+
+  .layer-pill.inactive:hover {
+    @apply border-aqua-300 bg-aqua-50;
+  }
+
+  .info-card {
+    @apply rounded-xl p-2.5;
+    background: rgba(241, 245, 249, 0.9);
+    border: 1px solid rgba(226, 232, 240, 0.8);
   }
 }
 
@@ -167,7 +212,7 @@ body {
 }
 
 .conv-pin {
-  background: #ff7f50;
+  background: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
   align-items: center;
   border: 2px solid #fff;
   border-radius: 999px;
@@ -185,7 +230,7 @@ body {
 .rest-pin,
 .destination-pin {
   align-items: center;
-  border: 2px solid #fff;
+  border: 2.5px solid #fff;
   border-radius: 999px;
   box-shadow: 0 4px 16px rgba(6, 182, 212, 0.25), 0 2px 4px rgba(0, 0, 0, 0.1);
   color: #fff;
@@ -195,16 +240,16 @@ body {
   height: 100%;
   justify-content: center;
   width: 100%;
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s ease;
 }
 
 .map-pin:hover {
-  transform: scale(1.12);
+  transform: scale(1.15);
   box-shadow: 0 6px 24px rgba(6, 182, 212, 0.35), 0 4px 8px rgba(0, 0, 0, 0.15);
 }
 
 .rest-pin-park {
-  background: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
 }
 
 .rest-pin-water {
@@ -256,9 +301,17 @@ button, a, input {
   border: 1px solid rgba(6, 182, 212, 0.15) !important;
   color: #0d9488 !important;
   transition: all 0.2s ease !important;
+  border-radius: 12px !important;
 }
 
 .leaflet-control-zoom a:hover {
   background: rgba(255, 255, 255, 0.95) !important;
   color: #06b6d4 !important;
+}
+
+.leaflet-control-zoom {
+  border-radius: 14px !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(6, 182, 212, 0.1) !important;
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.08) !important;
 }

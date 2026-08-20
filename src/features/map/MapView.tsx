@@ -86,19 +86,19 @@ export function MapView({
     if (showBuildingShade) {
       buildingShadows.forEach((item) => {
         L.polygon(item.shadow.map((point) => [point.lat, point.lng]), {
-          color: "#1e293b",
-          fillColor: "#1e293b",
-          fillOpacity: 0.36,
-          opacity: 0.46,
-          weight: 0
+          color: "#0891b2",
+          fillColor: "#22d3ee",
+          fillOpacity: 0.25,
+          opacity: 0.7,
+          weight: 1
         }).bindTooltip(`${item.name} / ${item.source}`).addTo(layer);
 
         L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
-          color: "#64748b",
-          fillColor: "#cbd5e1",
-          fillOpacity: 0.24,
-          opacity: 0.6,
-          weight: 1
+          color: "#06b6d4",
+          fillColor: "#a5f3fc",
+          fillOpacity: 0.2,
+          opacity: 0.8,
+          weight: 1.2
         }).bindTooltip(`${item.name} / 建物高さ 約${item.heightMeters}m`).addTo(layer);
       });
     }
