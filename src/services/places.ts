@@ -1,5 +1,21 @@
 import type { LatLng, Poi } from "../types/domain";
 
+type OverpassElement = {
+  type: string;
+  id: number | string;
+  lat?: number;
+  lon?: number;
+  center?: {
+    lat?: number;
+    lon?: number;
+  };
+  tags?: Record<string, string>;
+};
+
+type OverpassResponse = {
+  elements?: OverpassElement[];
+};
+
 // Fetch convenience stores around a point using the Overpass API
 export async function fetchConvenienceStores(center: LatLng, radiusMeters = 800): Promise<Poi[]> {
   const query = `[
@@ -21,12 +37,16 @@ out center;`;
 
   if (!res.ok) return [];
 
-  const data = await res.json().catch(() => null);
-  if (!data || !Array.isArray(data.elements)) return [];
+  const data = await res.json().catch(() => null) as OverpassResponse | null;
+  const elements = data?.elements;
+  if (!Array.isArray(elements)) return [];
 
-  const pois: Poi[] = data.elements.map((el: any) => {
-    const pos = el.type === "node" ? { lat: el.lat, lng: el.lon } : { lat: el.center?.lat ?? 0, lng: el.center?.lon ?? 0 };
+  const pois: Poi[] = elements.map((el) => {
+    const pos = el.type === "node"
+      ? { lat: el.lat ?? 0, lng: el.lon ?? 0 }
+      : { lat: el.center?.lat ?? 0, lng: el.center?.lon ?? 0 };
     const name = el.tags?.name ?? el.tags?.brand ?? "無名のコンビニ";
+
     return {
       id: `${el.type}/${el.id}`,
       name,
@@ -34,7 +54,7 @@ out center;`;
       position: pos,
       source: "overpass"
     } as Poi;
-  }).filter((p: Poi) => p.position.lat && p.position.lng);
+  }).filter((p: Poi) => p.position.lat !== 0 && p.position.lng !== 0);
 
   return pois;
 }
