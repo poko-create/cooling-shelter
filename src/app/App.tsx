@@ -281,8 +281,18 @@ export function App() {
             <div>
               <p className="flex items-center gap-1 text-xs font-semibold text-aqua-600"><Snowflake size={12} /> 都知事杯オープンデータ・ハッカソン2026</p>
               <h1 className="text-2xl font-bold tracking-normal">涼道ナビ<span className="text-aqua-500">TOKYO</span></h1>
-              <p className="text-xs text-glacial-400">
-                {openDataSource === "open-data" ? "東京都オープンデータ接続中" : "デモデータ表示中"}
+              <p className="mt-0.5 text-xs font-semibold text-glacial-500">
+                {openDataSource === "open-data" ? (
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500 shadow-[0_0_0_3px_rgba(16,185,129,0.12)]" />
+                    東京都オープンデータ接続中
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5">
+                    <span className="inline-block h-1.5 w-1.5 rounded-full bg-amber-400 shadow-[0_0_0_3px_rgba(251,191,36,0.14)]" />
+                    デモデータ表示中
+                  </span>
+                )}
               </p>
             </div>
             <button
@@ -316,25 +326,35 @@ export function App() {
           {heatRisk && (
             <button
               type="button"
-              className="w-full rounded-2xl bg-amber-50 p-3 text-left"
+              className="w-full rounded-2xl border border-amber-200/60 bg-gradient-to-br from-amber-50 via-white/75 to-frost-50/80 p-3 text-left shadow-sm backdrop-blur-sm transition-all hover:shadow-frost-sm"
               onClick={() => setHeatRiskExpanded((v) => !v)}
             >
               <div className="flex items-center justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle size={18} className="text-amber-600" />
-                  <p className="text-sm font-bold">熱中症リスク {heatRisk.level}</p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-right">
-                    <strong className="block text-xl leading-none">{heatRisk.score}</strong>
-                    <span className="text-[10px] text-slate-500">指標</span>
+                <div className="flex items-center gap-2.5">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white shadow-sm">
+                    <AlertTriangle size={16} />
                   </div>
-                  <span className="text-xs text-slate-400">{heatRiskExpanded ? "▲" : "▼"}</span>
+                  <div>
+                    <p className="text-xs font-bold text-glacial-800">熱中症リスク</p>
+                    <p className="text-[10px] font-bold text-amber-600">{heatRisk.level}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2.5">
+                  <div className="text-right">
+                    <strong className="block text-xl font-extrabold leading-none text-glacial-800">{heatRisk.score}</strong>
+                    <span className="text-[9px] font-semibold text-amber-600">指標</span>
+                  </div>
+                  <span
+                    className="text-xs text-amber-500 transition-transform duration-300"
+                    style={{ transform: heatRiskExpanded ? "rotate(180deg)" : "rotate(0deg)" }}
+                  >
+                    ▼
+                  </span>
                 </div>
               </div>
               {heatRiskExpanded && (
-                <>
-                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                <div className="mt-3 animate-fade-in">
+                  <div className="grid grid-cols-3 gap-2 text-center text-xs">
                     <WeatherCard icon={<CloudSun size={16} className="text-amber-500" />} label="気温" value={`${heatRisk.temperature.toFixed(1)}℃`} />
                     <WeatherCard icon={<Wind size={16} className="text-sky-500" />} label="風速" value={`${heatRisk.windSpeed.toFixed(1)}m/s`} />
                     <WeatherCard icon={<SunMedium size={16} className="text-orange-500" />} label="UV" value={`${heatRisk.uvIndex.toFixed(1)}`} />
@@ -342,8 +362,8 @@ export function App() {
                     <WeatherCard icon={<Waves size={16} className="text-cyan-500" />} label="湿度" value={`${heatRisk.humidity}%`} />
                     <WeatherCard icon={<Route size={16} className="text-emerald-600" />} label="WBGT" value={`${heatRisk.wbgt.toFixed(1)}`} />
                   </div>
-                  <p className="mt-2 text-[10px] text-slate-500">{heatRisk.source}</p>
-                </>
+                  <p className="mt-2 text-[10px] text-glacial-500">{heatRisk.source}</p>
+                </div>
               )}
             </button>
           )}
