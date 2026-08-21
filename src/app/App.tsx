@@ -465,7 +465,7 @@ export function App() {
         )}
 
         {message && (
-          <div className="mx-4 mt-3 animate-fade-in rounded-2xl bg-gradient-to-r from-glacial-800 to-glacial-900 px-4 py-3 text-sm text-white shadow-lg">
+          <div className="mx-4 mt-3 animate-fade-in rounded-2xl bg-gradient-to-r from-aqua-600 via-frost-600 to-aqua-600 px-4 py-2.5 text-xs font-semibold text-white shadow-frost-lg">
             {message}
           </div>
         )}
