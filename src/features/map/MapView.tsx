@@ -1,6 +1,6 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef } from "react";
 import L from "leaflet";
-import { Building2, LocateFixed, Snowflake, Store, Trees, Waves } from "lucide-react";
+import { LocateFixed } from "lucide-react";
 import { statusLabels, statusMarkerColors, statusShapes } from "../../services/status";
 import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter, Poi } from "../../types/domain";
 
@@ -26,11 +26,6 @@ type Props = {
   onPoiSelect: (poi: Poi) => void;
   onRestSpotSelect: (spot: RestSpot) => void;
   onMapTap: (position: LatLng) => void;
-  onToggleBuildingShade: () => void;
-  onToggleShelters: () => void;
-  onToggleConvenienceStores: () => void;
-  onToggleParkSpots: () => void;
-  onToggleWaterSpots: () => void;
 };
 
 export function MapView({
@@ -54,12 +49,7 @@ export function MapView({
   onShelterSelect,
   onPoiSelect,
   onRestSpotSelect,
-  onMapTap,
-  onToggleBuildingShade,
-  onToggleShelters,
-  onToggleConvenienceStores,
-  onToggleParkSpots,
-  onToggleWaterSpots
+  onMapTap
 }: Props) {
   const nodeRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<L.Map | null>(null);
@@ -96,19 +86,19 @@ export function MapView({
     if (showBuildingShade) {
       buildingShadows.forEach((item) => {
         L.polygon(item.shadow.map((point) => [point.lat, point.lng]), {
-          color: "#1e293b",
-          fillColor: "#1e293b",
-          fillOpacity: 0.36,
-          opacity: 0.46,
-          weight: 0
+          color: "#0891b2",
+          fillColor: "#22d3ee",
+          fillOpacity: 0.25,
+          opacity: 0.7,
+          weight: 1
         }).bindTooltip(`${item.name} / ${item.source}`).addTo(layer);
 
         L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
-          color: "#64748b",
-          fillColor: "#cbd5e1",
-          fillOpacity: 0.24,
-          opacity: 0.6,
-          weight: 1
+          color: "#06b6d4",
+          fillColor: "#a5f3fc",
+          fillOpacity: 0.2,
+          opacity: 0.8,
+          weight: 1.2
         }).bindTooltip(`${item.name} / 建物高さ 約${item.heightMeters}m`).addTo(layer);
       });
     }
@@ -215,48 +205,6 @@ export function MapView({
   return (
     <div className="relative h-full min-h-[62vh] w-full">
       <div ref={nodeRef} className="h-full min-h-[62vh] w-full" />
-      <div className="absolute left-1/2 top-3 z-[900] flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-white/50 bg-white/65 px-1.5 py-1 shadow-lg backdrop-blur-md">
-        <LayerToggleButton
-          active={showBuildingShade}
-          label="建物日陰の目安"
-          activeClassName="border-glacial-800 bg-glacial-900 text-white"
-          onClick={onToggleBuildingShade}
-        >
-          <Building2 size={14} />
-        </LayerToggleButton>
-        <LayerToggleButton
-          active={showShelters}
-          label="クーリングシェルター"
-          activeClassName="border-aqua-600 bg-aqua-600 text-white"
-          onClick={onToggleShelters}
-        >
-          <Snowflake size={14} />
-        </LayerToggleButton>
-        <LayerToggleButton
-          active={showConvenienceStores}
-          label="コンビニ"
-          activeClassName="border-orange-500 bg-orange-500 text-white"
-          onClick={onToggleConvenienceStores}
-        >
-          <Store size={14} />
-        </LayerToggleButton>
-        <LayerToggleButton
-          active={showParkSpots}
-          label="公園"
-          activeClassName="border-emerald-600 bg-emerald-600 text-white"
-          onClick={onToggleParkSpots}
-        >
-          <Trees size={14} />
-        </LayerToggleButton>
-        <LayerToggleButton
-          active={showWaterSpots}
-          label="給水スポット"
-          activeClassName="border-sky-500 bg-sky-500 text-white"
-          onClick={onToggleWaterSpots}
-        >
-          <Waves size={14} />
-        </LayerToggleButton>
-      </div>
       <button
         type="button"
         aria-label="現在地に戻る"
@@ -269,38 +217,5 @@ export function MapView({
         <LocateFixed size={17} />
       </button>
     </div>
-  );
-}
-
-function LayerToggleButton({
-  active,
-  label,
-  activeClassName,
-  children,
-  onClick
-}: {
-  active: boolean;
-  label: string;
-  activeClassName: string;
-  children: ReactNode;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      aria-label={label}
-      title={label}
-      className={`flex h-7 w-7 items-center justify-center rounded-full border transition ${
-        active
-          ? `${activeClassName} shadow-sm`
-          : "border-slate-200 bg-white text-slate-500 opacity-70 hover:bg-slate-50 hover:opacity-100"
-      }`}
-      onClick={(event) => {
-        event.stopPropagation();
-        onClick();
-      }}
-    >
-      {children}
-    </button>
   );
 }

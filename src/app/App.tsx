@@ -450,7 +450,44 @@ export function App() {
           </div>
         )}
 
-        <section className="min-h-[62vh] flex-1">
+        <section className="relative min-h-[62vh] flex-1">
+          <div className="absolute left-2 right-2 top-2 z-[900] flex gap-1 rounded-2xl border border-white/60 bg-white/85 px-1.5 py-1.5 shadow-glass backdrop-blur-xl">
+            <LayerToggle
+              icon={<Building2 size={14} />}
+              label="日陰"
+              active={showBuildingShade}
+              activeColor="bg-glacial-700"
+              onClick={() => setShowBuildingShade((current) => !current)}
+            />
+            <LayerToggle
+              icon={<Snowflake size={13} />}
+              label="シェルター"
+              active={showShelters}
+              activeColor="bg-aqua-600"
+              onClick={() => setShowShelters((current) => !current)}
+            />
+            <LayerToggle
+              icon={<Store size={13} />}
+              label="コンビニ"
+              active={showConvenienceStores}
+              activeColor="bg-orange-500"
+              onClick={() => setShowConvenienceStores((current) => !current)}
+            />
+            <LayerToggle
+              icon={<Trees size={13} />}
+              label="公園"
+              active={showParkSpots}
+              activeColor="bg-emerald-600"
+              onClick={() => setShowParkSpots((current) => !current)}
+            />
+            <LayerToggle
+              icon={<Waves size={13} />}
+              label="給水"
+              active={showWaterSpots}
+              activeColor="bg-aqua-500"
+              onClick={() => setShowWaterSpots((current) => !current)}
+            />
+          </div>
           <MapView
             center={mapViewCenter}
             currentPosition={mapCenter}
@@ -472,11 +509,6 @@ export function App() {
             onShelterSelect={setSelectedShelter}
             onPoiSelect={setSelectedPoi}
             onRestSpotSelect={setSelectedRestSpot}
-            onToggleBuildingShade={() => setShowBuildingShade((current) => !current)}
-            onToggleShelters={() => setShowShelters((current) => !current)}
-            onToggleConvenienceStores={() => setShowConvenienceStores((current) => !current)}
-            onToggleParkSpots={() => setShowParkSpots((current) => !current)}
-            onToggleWaterSpots={() => setShowWaterSpots((current) => !current)}
             onMapTap={(position) => {
               setSelectedMapTap(position);
               setSelectedShelter(null);
@@ -841,6 +873,39 @@ function WeatherCard({ icon, label, value }: { icon: React.ReactNode; label: str
       <div className="text-[10px] text-slate-500">{label}</div>
       <div className="font-bold text-slate-800">{value}</div>
     </div>
+  );
+}
+
+function LayerToggle({
+  icon,
+  label,
+  active,
+  activeColor,
+  onClick
+}: {
+  icon: React.ReactNode;
+  label: string;
+  active: boolean;
+  activeColor: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 py-[5px] text-[10px] font-bold transition-all duration-200 ${
+        active
+          ? `${activeColor} text-white shadow-sm`
+          : "bg-glacial-50 text-glacial-400 opacity-50 hover:bg-glacial-100 hover:text-glacial-500 hover:opacity-70"
+      }`}
+      title={active ? `地図から${label}を非表示にする` : `地図に${label}を表示する`}
+      onClick={(event) => {
+        event.stopPropagation();
+        onClick();
+      }}
+    >
+      {icon}
+      <span className="truncate leading-none">{label}</span>
+    </button>
   );
 }
 
