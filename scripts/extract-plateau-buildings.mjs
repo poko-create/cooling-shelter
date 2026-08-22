@@ -11,7 +11,7 @@ const TARGET_BOUNDS = {
   minLat: 35.6,
   maxLat: 35.72
 };
-const MAX_BUILDINGS = 3000;
+const MAX_BUILDINGS = 5000;
 
 const tileset = await fetchJson(TILESET_URL);
 const tileUrls = [];

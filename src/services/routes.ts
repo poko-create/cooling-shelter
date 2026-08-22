@@ -21,6 +21,19 @@ function uniqueRouteCandidates(routes: RouteCandidate[]) {
   });
 }
 
+function normalizeRouteCandidates(routes: RouteCandidate[]) {
+  return uniqueRouteCandidates(routes)
+    .sort((a, b) => a.distanceMeters - b.distanceMeters)
+    .slice(0, 3)
+    .map((route, index) => ({
+      ...route,
+      id: index === 0 ? "shortest" : route.source === "demo-fallback" ? `cool-${index}` : `ors-${index}`,
+      label: index === 0
+        ? route.source === "demo-fallback" ? "最短ルート（デモ）" : "最短ルート"
+        : route.source === "demo-fallback" ? `涼しい候補${index}（デモ）` : `候補ルート${index + 1}`
+    }));
+}
+
 function uniqueRouteCoordinates(routes: LatLng[][]) {
   const seen = new Set<string>();
   return routes.filter((coordinates) => {
@@ -37,14 +50,14 @@ function routeSignature(coordinates: LatLng[]) {
 
 export async function getRouteCandidates(start: LatLng, end: LatLng): Promise<RouteCandidate[]> {
   const apiRoutes = await getOpenRouteServiceCandidates(start, end);
-  if (apiRoutes.length > 0) return uniqueRouteCandidates(apiRoutes);
+  if (apiRoutes.length > 0) return normalizeRouteCandidates(apiRoutes);
 
   const routeCoordinates = [
     buildDemoPedestrianRoute(start, end),
     ...demoWaypointCandidates.map((waypoint) => buildDemoPedestrianRoute(start, end, waypoint))
   ];
 
-  return uniqueRouteCoordinates(routeCoordinates).slice(0, 3).map((coordinates, index) => {
+  const demoRoutes: RouteCandidate[] = uniqueRouteCoordinates(routeCoordinates).map((coordinates, index) => {
     const distance = routeDistance(coordinates);
     return {
       id: index === 0 ? "shortest" : `cool-${index}`,
@@ -55,6 +68,7 @@ export async function getRouteCandidates(start: LatLng, end: LatLng): Promise<Ro
       source: "demo-fallback"
     };
   });
+  return normalizeRouteCandidates(demoRoutes);
 }
 
 async function getOpenRouteServiceCandidates(start: LatLng, end: LatLng): Promise<RouteCandidate[]> {

@@ -34,6 +34,18 @@ const openDataSources = {
 
 type OpenDataKind = keyof typeof openDataSources;
 
+const kotoBounds = {
+  minLat: 35.6,
+  maxLat: 35.72,
+  minLng: 139.76,
+  maxLng: 139.86
+};
+
+const overpassEndpoints = [
+  "https://overpass-api.de/api/interpreter",
+  "https://overpass.kumi.systems/api/interpreter"
+];
+
 export default {
   async fetch(request: Request, env: Env): Promise<Response> {
     const url = new URL(request.url);
@@ -55,6 +67,10 @@ export default {
     const openDataMatch = url.pathname.match(/^\/api\/open-data\/([^/]+)$/);
     if (openDataMatch && request.method === "GET") {
       return getOpenData(openDataMatch[1], env);
+    }
+
+    if (url.pathname === "/api/places/convenience" && request.method === "GET") {
+      return getConvenienceStores(env);
     }
 
     if (url.pathname === "/api/availability" && request.method === "GET") {
@@ -87,7 +103,13 @@ async function getOpenData(kindParam: string, env: Env) {
     });
   }
 
-  const upstream = await fetch(openDataSources[kindParam]);
+  const upstream = await fetch(openDataSources[kindParam], {
+    headers: {
+      "Accept": "text/csv,*/*;q=0.8",
+      "Accept-Language": "ja,en-US;q=0.9,en;q=0.8",
+      "User-Agent": "Mozilla/5.0 (compatible; RyodoNaviTokyo/1.0; +https://ryodo-navi-tokyo.pages.dev)"
+    }
+  });
   if (!upstream.ok) {
     return json({
       error: "Failed to fetch open data",
@@ -106,6 +128,125 @@ async function getOpenData(kindParam: string, env: Env) {
 
 function isOpenDataKind(value: string): value is OpenDataKind {
   return value in openDataSources;
+}
+
+async function getConvenienceStores(env: Env) {
+  const cacheKey = "places:convenience:koto-v1";
+  const cached = await env.CACHE?.get(cacheKey);
+  if (cached) {
+    try {
+      return json(JSON.parse(cached), 200, {
+        "Cache-Control": "public, max-age=3600",
+        "X-Data-Source": "cache"
+      });
+    } catch {
+      await env.CACHE?.delete(cacheKey);
+    }
+  }
+
+  const query = buildConvenienceStoreQuery();
+  let lastStatus = 502;
+  let lastDetail = "";
+
+  for (const endpoint of overpassEndpoints) {
+    try {
+      const upstream = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          "Accept": "application/json,*/*;q=0.8",
+          "Content-Type": "text/plain; charset=utf-8",
+          "User-Agent": "RyodoNaviTokyo/1.0 (+https://ryodo-navi-tokyo.pages.dev)"
+        },
+        body: query
+      });
+
+      if (!upstream.ok) {
+        lastStatus = upstream.status;
+        lastDetail = await upstream.text().catch(() => "");
+        continue;
+      }
+
+      const data = await upstream.json().catch(() => null) as { elements?: unknown[] } | null;
+      if (!data || !Array.isArray(data.elements)) {
+        lastStatus = 502;
+        lastDetail = "Invalid Overpass response";
+        continue;
+      }
+
+      const payload = {
+        items: dedupePois(data.elements.map(normalizeOverpassElement).filter(Boolean) as ConveniencePoi[])
+      };
+
+      await env.CACHE?.put(cacheKey, JSON.stringify(payload), { expirationTtl: 60 * 60 * 6 });
+      return json(payload, 200, {
+        "Cache-Control": "public, max-age=3600",
+        "X-Data-Source": endpoint
+      });
+    } catch (error) {
+      lastStatus = 502;
+      lastDetail = error instanceof Error ? error.message : "Overpass request failed";
+      continue;
+    }
+  }
+
+  return json({
+    error: "Failed to fetch convenience stores",
+    status: lastStatus,
+    detail: lastDetail.slice(0, 800)
+  }, 502);
+}
+
+function buildConvenienceStoreQuery() {
+  return `[
+out:json][timeout:25];
+(
+  node["shop"="convenience"](${kotoBounds.minLat},${kotoBounds.minLng},${kotoBounds.maxLat},${kotoBounds.maxLng});
+  way["shop"="convenience"](${kotoBounds.minLat},${kotoBounds.minLng},${kotoBounds.maxLat},${kotoBounds.maxLng});
+  relation["shop"="convenience"](${kotoBounds.minLat},${kotoBounds.minLng},${kotoBounds.maxLat},${kotoBounds.maxLng});
+);
+out center;`;
+}
+
+type ConveniencePoi = {
+  id: string;
+  name: string;
+  category: string;
+  position: { lat: number; lng: number };
+  source: string;
+};
+
+function normalizeOverpassElement(element: unknown): ConveniencePoi | null {
+  if (!element || typeof element !== "object") return null;
+  const item = element as {
+    id?: number | string;
+    type?: string;
+    lat?: number;
+    lon?: number;
+    center?: { lat?: number; lon?: number };
+    tags?: { name?: string; brand?: string; shop?: string };
+  };
+
+  const lat = item.type === "node" ? item.lat : item.center?.lat;
+  const lng = item.type === "node" ? item.lon : item.center?.lon;
+  if (typeof lat !== "number" || typeof lng !== "number" || !item.id || !item.type) return null;
+
+  return {
+    id: `${item.type}/${item.id}`,
+    name: item.tags?.name ?? item.tags?.brand ?? "無名のコンビニ",
+    category: item.tags?.shop ?? "convenience",
+    position: { lat, lng },
+    source: "overpass"
+  };
+}
+
+function dedupePois(pois: ConveniencePoi[]) {
+  const seen = new Set<string>();
+  return pois.filter((poi) => {
+    const key = `${poi.name}-${poi.position.lat.toFixed(5)}-${poi.position.lng.toFixed(5)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 async function getAvailability(env: Env) {
@@ -192,11 +333,12 @@ async function routeProxy(request: Request, env: Env) {
   }));
 }
 
-function json(payload: unknown, status = 200) {
+function json(payload: unknown, status = 200, headers: Record<string, string> = {}) {
   return withCors(new Response(JSON.stringify(payload), {
     status,
     headers: {
-      "Content-Type": "application/json; charset=utf-8"
+      "Content-Type": "application/json; charset=utf-8",
+      ...headers
     }
   }));
 }

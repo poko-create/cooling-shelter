@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Building2, CloudSun, LocateFixed, MapPin, Navigation, Route, Snowflake, Store, SunMedium, Trees, Waves, Wind } from "lucide-react";
+import { createPortal } from "react-dom";
+import { AlertTriangle, Building2, CloudSun, LocateFixed, MapPin, Navigation, Route, Snowflake, Store, SunMedium, Trees, Waves, Wind, X } from "lucide-react";
 import * as turf from "@turf/turf";
 import { DATA_SPARSE_THRESHOLD, DEFAULT_ZOOM, DEMO_AREA_CENTER, DEMO_CURRENT_POSITION, TOKYO_FALLBACK_CENTER } from "../config/area";
 import { STALE_AVAILABILITY_HOURS } from "../config/scoring";
@@ -262,6 +263,33 @@ export function App() {
     setSelectedPoi(null);
   }
 
+  function handleRouteCancel() {
+    setDestination(null);
+    setRoutes([]);
+    setScores([]);
+  }
+
+  function handleShelterSelect(shelter: Shelter) {
+    setSelectedShelter(shelter);
+    setSelectedPoi(null);
+    setSelectedRestSpot(null);
+    setSelectedMapTap(null);
+  }
+
+  function handlePoiSelect(poi: Poi) {
+    setSelectedPoi(poi);
+    setSelectedShelter(null);
+    setSelectedRestSpot(null);
+    setSelectedMapTap(null);
+  }
+
+  function handleRestSpotSelect(spot: RestSpot) {
+    setSelectedRestSpot(spot);
+    setSelectedShelter(null);
+    setSelectedPoi(null);
+    setSelectedMapTap(null);
+  }
+
   if (staffShelter) {
     return (
       <StaffAvailabilityPage
@@ -456,6 +484,12 @@ export function App() {
             )}
           </form>
 
+          {message && (
+            <div className="animate-fade-in rounded-xl border border-white/40 bg-gradient-to-r from-aqua-500 via-frost-500 to-aqua-500 px-3 py-2 text-xs font-semibold text-white shadow-frost">
+              {message}
+            </div>
+          )}
+
         </header>
 
         {areaMode === "current" && shelters.length <= DATA_SPARSE_THRESHOLD && (
@@ -464,44 +498,38 @@ export function App() {
           </div>
         )}
 
-        {message && (
-          <div className="mx-4 mt-3 animate-fade-in rounded-2xl bg-gradient-to-r from-aqua-600 via-frost-600 to-aqua-600 px-4 py-2.5 text-xs font-semibold text-white shadow-frost-lg">
-            {message}
-          </div>
-        )}
-
         <section className="relative min-h-[62vh] flex-1">
-          <div className="absolute left-2 right-2 top-2 z-[900] flex gap-1 rounded-2xl border border-white/60 bg-white/85 px-1.5 py-1.5 shadow-glass backdrop-blur-xl">
+          <div className="absolute left-2 right-2 top-2 z-[900] flex gap-0.5 rounded-2xl border border-white/60 bg-white/85 px-1 py-1.5 shadow-glass backdrop-blur-xl">
             <LayerToggle
-              icon={<Building2 size={14} />}
+              icon={<Building2 size={11} />}
               label="日陰"
               active={showBuildingShade}
               activeColor="bg-glacial-700"
               onClick={() => setShowBuildingShade((current) => !current)}
             />
             <LayerToggle
-              icon={<Snowflake size={13} />}
+              icon={<Snowflake size={11} />}
               label="シェルター"
               active={showShelters}
               activeColor="bg-aqua-600"
               onClick={() => setShowShelters((current) => !current)}
             />
             <LayerToggle
-              icon={<Store size={13} />}
+              icon={<Store size={11} />}
               label="コンビニ"
               active={showConvenienceStores}
               activeColor="bg-orange-500"
               onClick={() => setShowConvenienceStores((current) => !current)}
             />
             <LayerToggle
-              icon={<Trees size={13} />}
+              icon={<Trees size={11} />}
               label="公園"
               active={showParkSpots}
               activeColor="bg-emerald-600"
               onClick={() => setShowParkSpots((current) => !current)}
             />
             <LayerToggle
-              icon={<Waves size={13} />}
+              icon={<Waves size={11} />}
               label="給水"
               active={showWaterSpots}
               activeColor="bg-aqua-500"
@@ -526,10 +554,13 @@ export function App() {
             selectedMapTap={selectedMapTap}
             bestRoute={bestRoute}
             shortestRoute={shortestRoute}
-            onShelterSelect={setSelectedShelter}
-            onPoiSelect={setSelectedPoi}
-            onRestSpotSelect={setSelectedRestSpot}
+            onShelterSelect={handleShelterSelect}
+            onPoiSelect={handlePoiSelect}
+            onRestSpotSelect={handleRestSpotSelect}
             onMapTap={(position) => {
+              setDestination(null);
+              setRoutes([]);
+              setScores([]);
               setSelectedMapTap(position);
               setSelectedShelter(null);
               setSelectedPoi(null);
@@ -540,14 +571,24 @@ export function App() {
 
         <Legend />
 
-        {destination && bestRoute && bestScore && (
-          <RoutePanel
-            destination={destination}
-            bestRoute={bestRoute}
-            shortestRoute={shortestRoute}
-            bestScore={bestScore}
-          />
+        {destination && (
+          bestRoute && bestScore ? (
+            <RoutePanel
+              destination={destination}
+              bestRoute={bestRoute}
+              shortestRoute={shortestRoute}
+              bestScore={bestScore}
+              onCancel={handleRouteCancel}
+            />
+          ) : (
+            <RouteLoadingPanel
+              destination={destination}
+              onCancel={handleRouteCancel}
+            />
+          )
         )}
+
+        <Credits />
 
         {selectedShelter && (
           <ShelterSheet
@@ -581,6 +622,8 @@ export function App() {
             position={selectedMapTap}
             onClose={() => setSelectedMapTap(null)}
             onRoute={() => {
+              setRoutes([]);
+              setScores([]);
               setDestination({ label: "地図で指定した場所", position: selectedMapTap, kind: "tap" });
               setSelectedMapTap(null);
             }}
@@ -596,6 +639,21 @@ function getStaffShelterId() {
   return match?.[1] ?? null;
 }
 
+function BottomSheet({ children, highPriority = false }: { children: React.ReactNode; highPriority?: boolean }) {
+  if (typeof document === "undefined") return null;
+
+  return createPortal(
+    <div
+      className={`fixed inset-x-0 bottom-0 mx-auto max-h-[calc(100dvh-1rem)] w-full max-w-[480px] overflow-y-auto rounded-t-lg bg-white px-4 pt-4 pb-[calc(1rem+env(safe-area-inset-bottom))] shadow-2xl ${
+        highPriority ? "z-[1600]" : "z-[1500]"
+      }`}
+    >
+      {children}
+    </div>,
+    document.body
+  );
+}
+
 function MapTapSheet({
   position,
   onClose,
@@ -606,15 +664,15 @@ function MapTapSheet({
   onRoute: () => void;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+    <BottomSheet highPriority>
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-lg font-bold">地図で指定した場所</h2>
-          <p className="text-sm text-slate-500">
+          <p className="truncate text-sm text-slate-500">
             {position.lat.toFixed(5)}, {position.lng.toFixed(5)}
           </p>
         </div>
-        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+        <CloseIconButton onClick={onClose} />
       </div>
       <button
         className="mt-2 flex min-h-12 w-full items-center justify-center gap-2 rounded-md bg-aqua-500 font-bold text-white"
@@ -623,54 +681,75 @@ function MapTapSheet({
         <Navigation size={18} />
         ここへ向かう（涼しいルートを見る）
       </button>
-    </div>
+    </BottomSheet>
   );
 }
 
 function Legend() {
   return (
-    <div className="grid grid-cols-4 gap-x-2 gap-y-2 border-t border-emerald-100 bg-white px-4 py-3 text-[11px] leading-tight text-slate-700">
-      <span className="flex items-center gap-1">
-        <span className="h-3 w-3 rounded-sm bg-slate-800/60" />
-        建物日陰
-      </span>
-      <span className="flex items-center gap-1">
-        <Snowflake size={13} className="text-aqua-600" />
-        シェルター
-      </span>
-      <span className="flex items-center gap-1">
-        <Store size={13} className="text-orange-500" />
-        コンビニ
-      </span>
-      <span className="flex items-center gap-1">
-        <Trees size={13} className="text-emerald-600" />
-        公園
-      </span>
-      <span className="flex items-center gap-1">
-        <Waves size={13} className="text-sky-500" />
-        給水
-      </span>
-      <span className="flex items-center gap-1">
-        <LocateFixed size={13} className="text-blue-600" />
-        現在地
-      </span>
-      <span className="flex items-center gap-1">
-        <MapPin size={13} className="text-slate-950" />
-        目的地
-      </span>
-      <span className="flex min-w-0 items-center gap-1">
-        <Route size={13} className="text-slate-500" />
-        <span className="flex min-w-0 flex-col gap-0.5">
-          <span className="flex items-center gap-1">
-            <span className="h-0 w-5 border-t-2 border-dashed border-sky-500" />
-            涼
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="h-0 w-5 border-t-2 border-dashed border-emerald-700" />
-            最短
+    <div className="border-t border-emerald-100 bg-white px-4 py-3">
+      <div className="grid grid-cols-4 gap-x-2 gap-y-2 text-[11px] leading-tight text-slate-700">
+        <span className="flex items-center gap-1">
+          <span className="h-3 w-3 rounded-sm border border-cyan-700/70 bg-cyan-400/70" />
+          建物日陰
+        </span>
+        <span className="flex items-center gap-1">
+          <Snowflake size={13} className="text-aqua-600" />
+          シェルター
+        </span>
+        <span className="flex items-center gap-1">
+          <Store size={13} className="text-orange-500" />
+          コンビニ
+        </span>
+        <span className="flex items-center gap-1">
+          <Trees size={13} className="text-emerald-600" />
+          公園
+        </span>
+        <span className="flex items-center gap-1">
+          <Waves size={13} className="text-sky-500" />
+          給水
+        </span>
+        <span className="flex items-center gap-1">
+          <LocateFixed size={13} className="text-blue-600" />
+          現在地
+        </span>
+        <span className="flex items-center gap-1">
+          <MapPin size={13} className="text-slate-950" />
+          目的地
+        </span>
+        <span className="flex min-w-0 items-center gap-1">
+          <Route size={13} className="text-slate-500" />
+          <span className="flex min-w-0 flex-col gap-0.5">
+            <span className="flex items-center gap-1">
+              <span className="h-0 w-5 border-t-2 border-dashed border-sky-500" />
+              涼
+            </span>
+            <span className="flex items-center gap-1">
+              <span className="h-0 w-5 border-t-2 border-dashed border-emerald-700" />
+              最短
+            </span>
           </span>
         </span>
-      </span>
+      </div>
+    </div>
+  );
+}
+
+function Credits() {
+  const credits = [
+    "Tiles courtesy of the OpenStreetMap Foundation",
+    "Routing by openrouteservice",
+    "Search by Nominatim",
+    "Inter font by Rasmus Andersson（Hosted by Google Fonts）",
+    "出典：環境省「熱中症予防情報サイト」WBGTデータ",
+    "出典：国土交通省 PLATEAU（東京都江東区 3D都市モデル）"
+  ];
+
+  return (
+    <div className="border-t border-slate-100 bg-white px-4 py-3 text-[9px] leading-snug text-slate-500">
+      {credits.map((credit) => (
+        <p key={credit}>{credit}</p>
+      ))}
     </div>
   );
 }
@@ -690,13 +769,13 @@ function ShelterSheet({
   const stale = availability ? Date.now() - new Date(availability.updatedAt).getTime() > STALE_AVAILABILITY_HOURS * 60 * 60 * 1000 : false;
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+    <BottomSheet>
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-bold">{shelter.name}</h2>
-          <p className="text-sm text-slate-600">{shelter.address}</p>
+          <p className="break-words text-sm text-slate-600">{shelter.address}</p>
         </div>
-        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+        <CloseIconButton onClick={onClose} />
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm">
         <Info label="定員" value={`${shelter.capacity}人`} />
@@ -709,7 +788,7 @@ function ShelterSheet({
         <Navigation size={18} />
         ここへ向かう（涼しいルートを見る）
       </button>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -742,13 +821,13 @@ function RestSpotSheet({
   const distance = Math.round(computeDistanceMeters(center, spot.position));
   const typeLabel = spot.type === "park" ? "公園" : "給水スポット";
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+    <BottomSheet>
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-bold">{spot.name}</h2>
           <p className="text-sm text-slate-600">{typeLabel}</p>
         </div>
-        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+        <CloseIconButton onClick={onClose} />
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm">
         <Info label="距離" value={`${distance}m`} />
@@ -758,7 +837,7 @@ function RestSpotSheet({
         <Navigation size={18} />
         ここへ向かう（涼しいルートを見る）
       </button>
-    </div>
+    </BottomSheet>
   );
 }
 
@@ -776,13 +855,13 @@ function PoiSheet({
   const distance = Math.round(computeDistanceMeters(center, poi.position));
 
   return (
-    <div className="fixed inset-x-0 bottom-0 z-[1000] mx-auto max-w-[480px] rounded-t-lg bg-white p-4 shadow-2xl">
+    <BottomSheet>
       <div className="mb-3 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl font-bold">{poi.name}</h2>
           <p className="text-sm text-slate-600">カテゴリ: {poi.category}</p>
         </div>
-        <button className="min-h-11 rounded-md px-3 text-sm font-semibold text-slate-600" onClick={onClose}>閉じる</button>
+        <CloseIconButton onClick={onClose} />
       </div>
       <div className="grid grid-cols-2 gap-2 text-sm">
         <Info label="距離" value={`${distance}m`} />
@@ -792,7 +871,28 @@ function PoiSheet({
         <Navigation size={18} />
         ここへ向かう（ルート表示）
       </button>
-    </div>
+    </BottomSheet>
+  );
+}
+
+function RouteLoadingPanel({
+  destination,
+  onCancel
+}: {
+  destination: Destination;
+  onCancel: () => void;
+}) {
+  return (
+    <section className="space-y-3 border-t border-emerald-100 bg-white px-4 py-4">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-xs font-semibold text-leaf">目的地</p>
+          <h2 className="truncate text-lg font-bold">{destination.label}</h2>
+          <p className="mt-1 text-sm text-slate-500">ルートを取得しています</p>
+        </div>
+        <CloseIconButton onClick={onCancel} />
+      </div>
+    </section>
   );
 }
 
@@ -800,23 +900,28 @@ function RoutePanel({
   destination,
   bestRoute,
   shortestRoute,
-  bestScore
+  bestScore,
+  onCancel
 }: {
   destination: Destination;
   bestRoute: RouteCandidate;
   shortestRoute: RouteCandidate | null;
   bestScore: RouteScore;
+  onCancel: () => void;
 }) {
   return (
     <section className="space-y-3 border-t border-emerald-100 bg-white px-4 py-4">
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
           <p className="text-xs font-semibold text-leaf">目的地</p>
-          <h2 className="text-lg font-bold">{destination.label}</h2>
+          <h2 className="truncate text-lg font-bold">{destination.label}</h2>
         </div>
-        <div className="rounded-md bg-emerald-50 px-3 py-2 text-center">
-          <p className="text-xs text-slate-600">緑陰スコア</p>
-          <strong className="text-2xl text-leaf">{bestScore.shadeScore}</strong>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <CloseIconButton onClick={onCancel} />
+          <div className="rounded-md bg-emerald-50 px-3 py-2 text-center">
+            <p className="text-xs text-slate-600">涼道スコア</p>
+            <strong className="text-2xl text-leaf">{bestScore.shadeScore}</strong>
+          </div>
         </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
@@ -879,9 +984,9 @@ function StaffAvailabilityPage({
 
 function Info({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-md bg-slate-50 p-2">
+    <div className="min-w-0 rounded-md bg-slate-50 p-2">
       <p className="text-xs text-slate-500">{label}</p>
-      <p className="font-semibold">{value}</p>
+      <p className="break-words font-semibold leading-snug">{value}</p>
     </div>
   );
 }
@@ -893,6 +998,20 @@ function WeatherCard({ icon, label, value }: { icon: React.ReactNode; label: str
       <div className="text-[10px] text-slate-500">{label}</div>
       <div className="font-bold text-slate-800">{value}</div>
     </div>
+  );
+}
+
+function CloseIconButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      aria-label="閉じる"
+      title="閉じる"
+      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-slate-100/95 text-slate-500 shadow-[0_4px_14px_rgba(15,23,42,0.16)] ring-1 ring-slate-200/80 transition hover:bg-slate-200 hover:text-slate-700 active:scale-95"
+      onClick={onClick}
+    >
+      <X size={17} />
+    </button>
   );
 }
 
@@ -912,7 +1031,7 @@ function LayerToggle({
   return (
     <button
       type="button"
-      className={`flex min-w-0 flex-1 items-center justify-center gap-1 rounded-xl px-1.5 py-[5px] text-[10px] font-bold transition-all duration-200 ${
+      className={`flex min-w-0 flex-1 items-center justify-center gap-[1px] rounded-xl px-0.5 py-[5px] text-[8px] font-bold transition-all duration-200 ${
         active
           ? `${activeColor} text-white shadow-sm`
           : "bg-glacial-50 text-glacial-400 opacity-50 hover:bg-glacial-100 hover:text-glacial-500 hover:opacity-70"
@@ -924,7 +1043,7 @@ function LayerToggle({
       }}
     >
       {icon}
-      <span className="truncate leading-none">{label}</span>
+      <span className="min-w-0 whitespace-nowrap leading-none">{label}</span>
     </button>
   );
 }

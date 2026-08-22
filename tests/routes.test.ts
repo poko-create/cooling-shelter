@@ -5,6 +5,7 @@ import type { BuildingShadow, Poi, RouteCandidate, Shelter } from "../src/types/
 
 describe("demo pedestrian fallback routes", () => {
   beforeEach(() => {
+    vi.unstubAllGlobals();
     vi.stubEnv("VITE_API_BASE_URL", "");
     vi.stubEnv("VITE_ORS_API_KEY", "");
   });
@@ -28,7 +29,9 @@ describe("demo pedestrian fallback routes", () => {
       { lat: 35.6802, lng: 139.8066 }
     );
 
-    expect(routes[1].coordinates).toContainEqual({ lat: 35.6765, lng: 139.8077 });
+    expect(routes.some((route) =>
+      route.coordinates.some((point) => point.lat === 35.6765 && point.lng === 139.8077)
+    )).toBe(true);
   });
 
   it("keeps fallback tree density nonzero around Ito-Yokado Kiba", async () => {
@@ -40,6 +43,31 @@ describe("demo pedestrian fallback routes", () => {
 
     expect(mockTrees.length).toBeGreaterThan(1000);
     expect(scores.some((score) => score.treeCount > 0 && score.treeDensityPerKm > 0)).toBe(true);
+  });
+
+  it("marks the shortest API route by distance even when it is not returned first", async () => {
+    vi.stubEnv("VITE_API_BASE_URL", "https://example.test");
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      features: [
+        {
+          geometry: { coordinates: [[139.81, 35.67], [139.82, 35.67], [139.83, 35.67]] },
+          properties: { summary: { distance: 220, duration: 180 } }
+        },
+        {
+          geometry: { coordinates: [[139.81, 35.67], [139.815, 35.67]] },
+          properties: { summary: { distance: 110, duration: 90 } }
+        }
+      ]
+    }), { status: 200 })));
+
+    const routes = await getRouteCandidates(
+      { lat: 35.67, lng: 139.81 },
+      { lat: 35.67, lng: 139.815 }
+    );
+
+    expect(routes[0].id).toBe("shortest");
+    expect(routes[0].distanceMeters).toBe(110);
+    expect(routes[1].distanceMeters).toBe(220);
   });
 
   it("includes fallback trees beyond the Kiba demo core", () => {

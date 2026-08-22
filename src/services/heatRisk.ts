@@ -47,7 +47,7 @@ export async function getHeatRisk(position: LatLng): Promise<HeatRisk> {
       uvIndex,
       wbgt,
       observedAt: payload.current?.time ?? new Date().toISOString(),
-      source: "Open-Meteo 気温・湿度・風速・体感温度・UVから簡易WBGT目安を算出"
+      source: "Weather data by Open-Meteo.com から気温・湿度・風速・体感温度・UVを取得し、簡易WBGT目安を算出"
     };
   } catch {
     return fallbackHeatRisk();

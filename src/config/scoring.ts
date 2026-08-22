@@ -1,8 +1,8 @@
 export const SCORING_WEIGHTS = {
-  treeDensity: 0.16,
-  buildingShade: 0.42,
-  greenPark: 0.16,
-  waterAndRest: 0.16,
+  treeDensity: 0.1,
+  buildingShade: 0.6,
+  greenPark: 0.1,
+  waterAndRest: 0.1,
   shortDetour: 0.1
 };
 

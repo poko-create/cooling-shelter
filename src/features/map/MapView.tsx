@@ -4,6 +4,9 @@ import { LocateFixed } from "lucide-react";
 import { statusLabels, statusMarkerColors, statusShapes } from "../../services/status";
 import type { Availability, BuildingShadow, Destination, LatLng, RestSpot, RouteCandidate, Shelter, Poi } from "../../types/domain";
 
+const MIN_VISIBLE_BUILDING_SHADE_HEIGHT_METERS = 30;
+const MIN_VISIBLE_BUILDING_FOOTPRINT_HEIGHT_METERS = 50;
+
 type Props = {
   center: LatLng;
   currentPosition: LatLng;
@@ -64,7 +67,7 @@ export function MapView({
 
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
       maxZoom: 19,
-      attribution: "&copy; OpenStreetMap contributors"
+      attribution: "Map data © OpenStreetMap contributors"
     }).addTo(map);
     L.control.zoom({ position: "bottomright" }).addTo(map);
 
@@ -84,22 +87,26 @@ export function MapView({
     layer.clearLayers();
 
     if (showBuildingShade) {
-      buildingShadows.forEach((item) => {
+      buildingShadows.filter((item) => item.heightMeters >= MIN_VISIBLE_BUILDING_SHADE_HEIGHT_METERS).forEach((item) => {
         L.polygon(item.shadow.map((point) => [point.lat, point.lng]), {
           color: "#0891b2",
           fillColor: "#22d3ee",
-          fillOpacity: 0.25,
-          opacity: 0.7,
+          fillOpacity: 0.18,
+          interactive: false,
+          opacity: 0.55,
           weight: 1
         }).bindTooltip(`${item.name} / ${item.source}`).addTo(layer);
 
-        L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
-          color: "#06b6d4",
-          fillColor: "#a5f3fc",
-          fillOpacity: 0.2,
-          opacity: 0.8,
-          weight: 1.2
-        }).bindTooltip(`${item.name} / 建物高さ 約${item.heightMeters}m`).addTo(layer);
+        if (item.heightMeters >= MIN_VISIBLE_BUILDING_FOOTPRINT_HEIGHT_METERS) {
+          L.polygon(item.footprint.map((point) => [point.lat, point.lng]), {
+            color: "#0e7490",
+            fillColor: "#ecfeff",
+            fillOpacity: 0.1,
+            interactive: false,
+            opacity: 0.45,
+            weight: 0.8
+          }).addTo(layer);
+        }
       });
     }
 
@@ -125,7 +132,10 @@ export function MapView({
       });
 
       marker.bindTooltip(`${shelter.name} / ${statusLabels[status]}`);
-      marker.on("click", () => onShelterSelect(shelter));
+      marker.on("click", (event) => {
+        L.DomEvent.stopPropagation(event.originalEvent);
+        onShelterSelect(shelter);
+      });
       marker.addTo(layer);
     });
 
@@ -146,7 +156,10 @@ export function MapView({
         })
       });
       marker.bindTooltip(`${spot.name} / ${spot.source}`);
-      marker.on("click", () => onRestSpotSelect(spot));
+      marker.on("click", (event) => {
+        L.DomEvent.stopPropagation(event.originalEvent);
+        onRestSpotSelect(spot);
+      });
       marker.addTo(layer);
     });
 
@@ -161,7 +174,10 @@ export function MapView({
           })
         });
         marker.bindTooltip(`${p.name} / ${p.source}`);
-        marker.on("click", () => onPoiSelect(p));
+        marker.on("click", (event) => {
+          L.DomEvent.stopPropagation(event.originalEvent);
+          onPoiSelect(p);
+        });
         marker.addTo(layer);
       });
     }
@@ -169,6 +185,7 @@ export function MapView({
     if (shortestRoute) {
       L.polyline(shortestRoute.coordinates.map((point) => [point.lat, point.lng]), {
         color: "#146b43",
+        interactive: false,
         weight: 7,
         opacity: 0.85,
         dashArray: "10 8"
@@ -178,6 +195,7 @@ export function MapView({
     if (bestRoute) {
       L.polyline(bestRoute.coordinates.map((point) => [point.lat, point.lng]), {
         color: "#0ea5e9",
+        interactive: false,
         weight: 5,
         opacity: 0.95,
         dashArray: "4 8"

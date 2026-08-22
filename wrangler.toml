@@ -8,8 +8,8 @@ port = 8788
 [[d1_databases]]
 binding = "DB"
 database_name = "ryodo-navi-tokyo"
-database_id = "replace-with-cloudflare-d1-id"
+database_id = "8abcdbd1-5c18-4189-bb84-254b630da1e5"
 
 [[kv_namespaces]]
 binding = "CACHE"
-id = "replace-with-cloudflare-kv-id"
+id = "cb3e84adaca64132abe8a456366fb68e"
